@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gridforge-stress.invalid/schemas/scenario/1",
+  "title": "Scenario catalogue v1",
+  "type": "object",
+  "required": ["schema_version", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "scenario-catalogue/1"},
+    "scenarios": {"type": "array", "minItems": 1, "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "source_ids", "module", "implemented", "denominator_or_scope", "must_not_claim"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^GF-\\d{3}$"},
+        "title": {"type": "string"},
+        "source_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "module": {"type": "string"},
+        "implemented": {"enum": ["offline_validator", "status_only", "not_implemented"]},
+        "denominator_or_scope": {"type": "string"},
+        "must_not_claim": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    }}
+  }
+}

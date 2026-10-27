@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gridforge-stress.invalid/schemas/manifest/1",
+  "title": "Dataset manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_id", "source_url", "origin", "retrieved_at", "retrieval_status",
+               "response_status", "sha256", "byte_count", "record_count", "time_coverage",
+               "upstream_release", "units", "transformations", "limitations", "attribution"],
+  "properties": {
+    "schema_version": {"const": "dataset-manifest/1"},
+    "source_id": {"type": "string"},
+    "source_url": {"type": "string"},
+    "origin": {"enum": ["live_fetch", "source_derived_fixture", "synthetic_fixture"]},
+    "retrieved_at": {"type": ["string", "null"]},
+    "retrieval_status": {"enum": ["fetched_validated", "fetched_failed_validation", "fetch_failed", "not_attempted", "synthetic"]},
+    "response_status": {"type": ["integer", "null"]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "byte_count": {"type": "integer", "minimum": 0},
+    "record_count": {"type": ["integer", "null"], "minimum": 0},
+    "time_coverage": {"type": ["object", "null"]},
+    "upstream_release": {"type": ["string", "null"]},
+    "units": {"type": "object"},
+    "transformations": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "attribution": {"type": "string"}
+  }
+}

@@ -1,0 +1,6 @@
+{"series": [
+ {"period_utc": "2026-03-08T05:00:00Z", "value": 1000, "published_at": "2026-03-08T07:00:00Z"},
+ {"period_utc": "2026-03-08T06:00:00Z", "value": 1010, "published_at": "2026-03-08T07:00:00Z"},
+ {"period_utc": "2026-03-08T07:00:00Z", "value": 1020, "published_at": "2026-03-08T08:00:00Z"},
+ {"period_utc": "2026-03-08T08:00:00Z", "value": 1030, "published_at": "2026-03-08T09:00:00Z"}
+]}

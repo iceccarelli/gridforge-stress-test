@@ -1,0 +1,20 @@
+# Local hooks that call the locked toolchain, so hook versions can never drift from CI.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --locked ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run --locked ruff format --check
+        language: system
+        types: [python]
+      - id: mypy
+        name: mypy src
+        entry: uv run --locked mypy src
+        language: system
+        pass_filenames: false
+        types: [python]

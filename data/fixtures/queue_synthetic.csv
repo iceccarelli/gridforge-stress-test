@@ -1,0 +1,7 @@
+proj,stat,entered,withdrawn,in_service,mw,tech
+S-001,Operational,2018-03-01,,2022-06-30,100,solar
+S-002,Withdrawn,2018-05-10,2020-01-15,,50,wind
+S-003,Active,2018-07-01,,,200,storage
+S-004,Operational,2018-09-09,,2023-01-01,75,gas
+S-005,Withdrawn,2018-11-11,2019-03-03,,20,solar
+S-006,Active,2024-02-02,,,300,solar

@@ -1,0 +1,5 @@
+{"pois": [
+ {"name": "SYN-A 500 kV", "listed_as": "open"},
+ {"name": "SYN-B 500 kV", "listed_as": "restricted"},
+ {"name": "SYN-C 230 kV", "listed_as": "open_complex_upgrades", "mitigation_cost_is_placeholder": true}
+]}

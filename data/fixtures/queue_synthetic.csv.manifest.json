@@ -1,0 +1,24 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "lbnl-queued-up",
+  "source_url": "https://emp.lbl.gov/queues",
+  "origin": "synthetic_fixture",
+  "retrieved_at": null,
+  "retrieval_status": "synthetic",
+  "response_status": null,
+  "sha256": "e7a1e0c910e19553eb7dcd0f00aadf56916952ae865dc2865f30348cb8cfc87b",
+  "byte_count": 315,
+  "record_count": 6,
+  "time_coverage": null,
+  "upstream_release": null,
+  "units": {
+    "capacity": "MW"
+  },
+  "transformations": [
+    "hand-written synthetic data; no source data was copied"
+  ],
+  "limitations": [
+    "SYNTHETIC: invented for deterministic tests; says nothing about the real source or any real project"
+  ],
+  "attribution": "Synthetic fixture authored in this repository; not source-derived, so no upstream attribution applies."
+}
