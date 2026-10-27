@@ -16,7 +16,7 @@
         "pdf"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "Queued Up: 2026 Edition, Characteristics of Power Plants Seeking Transmission Interconnection As of the End of 2025. Publication page (eta-publications.lbl.gov) Last-Modified 2026-10-27. Data file path /sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx; report PDF /sites/default/files/2026-06/queued_up_2026_edition.pdf. Page text: ~8,200 projects actively seeking grid connection as of end of 2025.",
+      "release_identity": "Queued Up: 2026 Edition, Characteristics of Power Plants Seeking Transmission Interconnection As of the End of 2025. Data file path /sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx on eta-publications.lbl.gov; server declares 15,571,236 bytes (Content-Length, GitHub Actions probe run 40580149328; not downloaded). Report PDF /sites/default/files/2026-06/queued_up_2026_edition.pdf. Page text: ~8,200 projects actively seeking grid connection as of end of 2025. The publication page's Last-Modified header differed between two reads on 2026-10-27, so it is not used as a release date.",
       "license_attribution": "Page text: 'The Queued Up data file is licensed CC BY 4.0. You may use, share, or adapt the dataset as long as you attribute it to Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker.'",
       "semantics": "Project-level interconnection queue data file for projects seeking transmission interconnection as of end of 2025 (publisher description)",
       "units": "UNVERIFIED (MW expected)",
@@ -27,12 +27,12 @@
         "Data as of end of 2025: a snapshot, not a forecast",
         "Queue statistic is not a data-centre load-connection probability",
         "emp.lbl.gov (incl. /queues) returns HTTP 403 to automated requests (probe run 40579353392); eta-publications.lbl.gov serves the same publication page",
-        "Workbook not yet downloaded: size, sheet names, columns, codebook and units are UNVERIFIED"
+        "Workbook not yet downloaded: declared size 15,571,236 bytes (above the 3 MB probe cap, below the 25 MB registry cap); sheet names, columns, codebook and units are UNVERIFIED"
       ],
       "verification": {
         "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) via GitHub Actions probe run 40579353392 (2026-10-27): title, licence wording and data-file link taken from the page. The locator emp.lbl.gov/queues itself returned HTTP 403 and was NOT read."
+        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) in GitHub Actions probe run 40579353392 and again in GitHub Actions probe run 40580149328: title, licence wording and data-file link taken from the page; workbook Content-Length from GitHub Actions probe run 40580149328. The locator emp.lbl.gov/queues returned HTTP 403 in both runs and was NOT read."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
@@ -74,7 +74,7 @@
       "verification": {
         "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "HTML page read (HTTP 200, 70,868 bytes) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27); title and document links extracted; licence/units/time not stated on the page"
+        "basis": "HTML page read (HTTP 200, 70,868 bytes) in GitHub Actions runs 40578807015, 40579353392 (this one failed on IPv6 'Network is unreachable', fixed) and 40580149328 (all 2026-10-27); title and document links extracted; licence/units/time not stated on the page"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
@@ -97,7 +97,7 @@
         "pdf"
       ],
       "acquisition_method": "http_download",
-      "release_identity": "PDF served by CAISO: Last-Modified 2026-01-16T21:19:52Z, 124,677 bytes, ETag be8341f5f57cadba310f663727dea697 (headers read 2026-10-27); contents not yet parsed",
+      "release_identity": "PDF served by CAISO: Last-Modified 2026-01-16T21:19:52Z, 124,677 bytes, ETag be8341f5f57cadba310f663727dea697, content sha256 10362930568a770e671005ec3c27c0ac3d39f6a807a6a7c2882b0ce284d8b511 identical in GitHub Actions probe run 40579353392 and GitHub Actions probe run 40580149328 (2026-10-27); contents not yet parsed",
       "license_attribution": "UNVERIFIED",
       "semantics": "Informational POI availability tables (restricted POIs; POIs open with complex upgrades); a listing is not an allocation",
       "units": "kV, kA, USD (partly from snippets)",
