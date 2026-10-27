@@ -1,0 +1,26 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "lbnl-queued-up",
+  "source_url": "https://emp.lbl.gov/queues",
+  "origin": "synthetic_fixture",
+  "retrieved_at": null,
+  "retrieval_status": "synthetic",
+  "response_status": null,
+  "sha256": "152977ab0403594e108e21a01e2f2cee5705eaff5471590a673aef0fe36a48c6",
+  "byte_count": 3238,
+  "record_count": null,
+  "time_coverage": null,
+  "upstream_release": "copied from GridForge-AI examples/intake/reference_hall.json at commit 034501ba2932d3600344b88b7356685062a4bbd5",
+  "units": {
+    "capacity": "MW/MVA/kW per product intake schema",
+    "lead_time": "weeks"
+  },
+  "transformations": [
+    "verbatim copy, no edits"
+  ],
+  "limitations": [
+    "SYNTHETIC: GridForge's own synthetic reference hall (project note: 'SYNTHETIC REFERENCE DATA \u2014 not a customer asset'); not source-derived from any external dataset",
+    "source_id is a placeholder required by the manifest schema; the file has no external publisher"
+  ],
+  "attribution": "Authored by the GridForge-AI project as synthetic reference data; no external attribution applies."
+}

@@ -1,0 +1,22 @@
+# environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+dist/
+build/
+*.egg-info/
+# credentials: never commit
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+# raw downloads and generated datasets: reproduce them, do not commit them
+data/raw/
+data/generated/
+data/snapshots/
+out/

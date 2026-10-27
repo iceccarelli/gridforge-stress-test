@@ -1,0 +1,55 @@
+name: ci
+
+# Ordinary CI is offline and deterministic: no secrets, no live sources, no product checkout.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install ${{ matrix.python-version }}
+      - run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy src
+      - run: uv run --locked pytest
+      - run: uv run --locked gridforge-stress doctor
+      - run: uv run --locked gridforge-stress validate-fixtures
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --all-groups
+      - run: uv build
+      - name: Wheel must carry registry and schemas
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
+          for need in ("_data/configs/sources.json", "_data/schemas/source.schema.json"):
+              assert any(n.endswith(need) for n in names), need
+          PY
+
+  dependency-audit:
+    # Fails on known vulnerabilities in the locked set; the result is actionable, not cosmetic.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --all-groups
+      - run: uv run --locked pip-audit --strict --skip-editable

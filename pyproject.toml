@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gridforge-stress"
+version = "0.1.0"
+description = "Independent source-integrity and adversarial acceptance harness for GridForge Time-to-Power"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = ["jsonschema>=4.23,<5"]
+
+[project.scripts]
+gridforge-stress = "gridforge_stress.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "hypothesis>=6.120",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "types-jsonschema>=4.23",
+  "build>=1.2",
+  "pip-audit>=2.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gridforge_stress"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"configs" = "gridforge_stress/_data/configs"
+"schemas" = "gridforge_stress/_data/schemas"
+"data/fixtures" = "gridforge_stress/_data/data/fixtures"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["E501"]  # ruff format owns code wrapping; long prose lines in docstrings are fine
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104", "S105", "S106", "S311", "RUF005"]
+"src/gridforge_stress/doctor.py" = ["S603", "S607"]  # fixed argv, no shell, read-only git queries
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m 'not live and not product'"
+markers = [
+  "unit: fast offline unit tests",
+  "contract: offline schema/registry/fixture contracts",
+  "integration: integration tests (offline unless also marked live/product)",
+  "product: needs the GridForge-AI checkout (GRIDFORGE_PRODUCT_DIR); opt in with -m product",
+  "live: needs network/credentials; opt in with -m live",
+]

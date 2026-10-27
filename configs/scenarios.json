@@ -1,0 +1,112 @@
+{
+  "schema_version": "scenario-catalogue/1",
+  "scenarios": [
+    {
+      "id": "GF-001",
+      "title": "LBNL queue parsing and integrity",
+      "source_ids": [
+        "lbnl-queued-up"
+      ],
+      "module": "queue",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Rows of a declared column mapping; no workbook reader until sheet names are verified",
+      "must_not_claim": [
+        "facts about columns not yet verified"
+      ]
+    },
+    {
+      "id": "GF-002",
+      "title": "Queue timing and outcomes",
+      "source_ids": [
+        "lbnl-queued-up"
+      ],
+      "module": "queue",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Explicit entry-year cohort; completed/withdrawn/active denominators",
+      "must_not_claim": [
+        "a data-centre load-connection probability",
+        "a guaranteed time-to-power"
+      ]
+    },
+    {
+      "id": "GF-003",
+      "title": "CAISO POI constraints",
+      "source_ids": [
+        "caiso-facility-library",
+        "caiso-pge-c16-poi"
+      ],
+      "module": "poi",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Per-POI status classification",
+      "must_not_claim": [
+        "a candidate POI as a confirmed allocation"
+      ]
+    },
+    {
+      "id": "GF-004",
+      "title": "EIA-930 hourly integrity",
+      "source_ids": [
+        "eia-930",
+        "eia-api"
+      ],
+      "module": "hourly",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Hourly UTC series",
+      "must_not_claim": [
+        "site-specific headroom from a BA reading"
+      ]
+    },
+    {
+      "id": "GF-005",
+      "title": "ERCOT source status",
+      "source_ids": [
+        "ercot-data-portal"
+      ],
+      "module": "ercot",
+      "implemented": "status_only",
+      "denominator_or_scope": "Access status only",
+      "must_not_claim": [
+        "any live ERCOT data"
+      ]
+    },
+    {
+      "id": "GF-006",
+      "title": "Cambium scenarios",
+      "source_ids": [
+        "nrel-cambium"
+      ],
+      "module": "scenario_data",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Scenario identity, units, resolution",
+      "must_not_claim": [
+        "modeled values as observed or guaranteed prices"
+      ]
+    },
+    {
+      "id": "GF-007",
+      "title": "Utility rate structures",
+      "source_ids": [
+        "openei-urdb"
+      ],
+      "module": "tariff",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Tariff record",
+      "must_not_claim": [
+        "a site's contracted rate"
+      ]
+    },
+    {
+      "id": "GF-008",
+      "title": "Weather context",
+      "source_ids": [
+        "nws-api"
+      ],
+      "module": "weather",
+      "implemented": "offline_validator",
+      "denominator_or_scope": "Observation vs forecast",
+      "must_not_claim": [
+        "a site cooling-load measurement"
+      ]
+    }
+  ]
+}

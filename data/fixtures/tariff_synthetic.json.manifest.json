@@ -1,0 +1,22 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "openei-urdb",
+  "source_url": "https://apps.openei.org/services/doc/rest/util_rates/",
+  "origin": "synthetic_fixture",
+  "retrieved_at": null,
+  "retrieval_status": "synthetic",
+  "response_status": null,
+  "sha256": "55bc21bd6816c1eaff78f46f0b6cc6375d8cea568ff3359d02370e7ff05d185d",
+  "byte_count": 788,
+  "record_count": null,
+  "time_coverage": null,
+  "upstream_release": null,
+  "units": {},
+  "transformations": [
+    "hand-written synthetic data; no source data was copied"
+  ],
+  "limitations": [
+    "SYNTHETIC: invented for deterministic tests; says nothing about the real source or any real project"
+  ],
+  "attribution": "Synthetic fixture authored in this repository; not source-derived, so no upstream attribution applies."
+}

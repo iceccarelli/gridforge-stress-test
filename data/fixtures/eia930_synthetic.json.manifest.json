@@ -1,0 +1,22 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "eia-930",
+  "source_url": "https://www.eia.gov/electricity/930-content/about.html",
+  "origin": "synthetic_fixture",
+  "retrieved_at": null,
+  "retrieval_status": "synthetic",
+  "response_status": null,
+  "sha256": "1334369022b3c3bfb42a85d1166a91a2e88cf55d497f0ff3366fcf633071ee7d",
+  "byte_count": 399,
+  "record_count": null,
+  "time_coverage": null,
+  "upstream_release": null,
+  "units": {},
+  "transformations": [
+    "hand-written synthetic data; no source data was copied"
+  ],
+  "limitations": [
+    "SYNTHETIC: invented for deterministic tests; says nothing about the real source or any real project"
+  ],
+  "attribution": "Synthetic fixture authored in this repository; not source-derived, so no upstream attribution applies."
+}

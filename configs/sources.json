@@ -1,0 +1,349 @@
+{
+  "schema_version": "source-registry/1",
+  "sources": [
+    {
+      "id": "lbnl-queued-up",
+      "name": "LBNL Queued Up",
+      "owner": "Lawrence Berkeley National Laboratory (data compiled with GridTracker)",
+      "locator": "https://emp.lbl.gov/queues",
+      "allowed_hosts": [
+        "emp.lbl.gov",
+        "eta-publications.lbl.gov"
+      ],
+      "access_status": "public",
+      "formats": [
+        "xlsx (UNVERIFIED)",
+        "pdf"
+      ],
+      "acquisition_method": "manual_download",
+      "release_identity": "Queued Up 2026 Edition, data through end of 2025 (publication month conflicting in sources)",
+      "license_attribution": "CC BY 4.0; attribute LBNL and GridTracker (wording UNVERIFIED)",
+      "semantics": "Project-level interconnection queue requests; snapshot, not a forecast",
+      "units": "UNVERIFIED (MW expected)",
+      "time_convention": "UNVERIFIED",
+      "geography": "US, project level, by ISO/utility",
+      "credential_env": [],
+      "limitations": [
+        "Snapshot only; later activity absent",
+        "Queue statistic is not a data-centre load-connection probability",
+        "Workbook link, sheet names and codebook not verified"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/pdf"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "caiso-facility-library",
+      "name": "CAISO interconnection facility library",
+      "owner": "California ISO",
+      "locator": "https://www.caiso.com/library/interconnection-facility-information",
+      "allowed_hosts": [
+        "www.caiso.com"
+      ],
+      "access_status": "unverified",
+      "formats": [
+        "UNVERIFIED"
+      ],
+      "acquisition_method": "manual_download",
+      "release_identity": "UNVERIFIED",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Interconnection facility information",
+      "units": "UNVERIFIED",
+      "time_convention": "UNVERIFIED",
+      "geography": "CAISO footprint",
+      "credential_env": [],
+      "limitations": [
+        "Page contents not read"
+      ],
+      "verification": {
+        "status": "unverified",
+        "checked_on": "2026-10-27",
+        "basis": "Publisher host unreachable from the build sandbox; nothing read. Fields are placeholders to verify."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "text/html",
+        "application/pdf"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "caiso-pge-c16-poi",
+      "name": "CAISO PG&E Cluster 16 POI availability",
+      "owner": "California ISO / PG&E",
+      "locator": "https://www.caiso.com/documents/pg-e-information-on-points-of-interconnection-poi-availability-for-cluster-16.pdf",
+      "allowed_hosts": [
+        "www.caiso.com"
+      ],
+      "access_status": "public",
+      "formats": [
+        "pdf"
+      ],
+      "acquisition_method": "http_download",
+      "release_identity": "Notice dated 2026-01-15 per search snippet; PDF version UNVERIFIED",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Informational POI availability tables (restricted POIs; POIs open with complex upgrades); a listing is not an allocation",
+      "units": "kV, kA, USD (partly from snippets)",
+      "time_convention": "UNVERIFIED",
+      "geography": "PG&E area POIs",
+      "credential_env": [],
+      "limitations": [
+        "Informational only; tables may change after the notice",
+        "PDF table extraction not validated",
+        "Candidate or open POI is not a confirmed allocation"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/pdf"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "eia-930",
+      "name": "EIA-930 Hourly Electric Grid Monitor",
+      "owner": "U.S. Energy Information Administration (data reported by balancing authorities)",
+      "locator": "https://www.eia.gov/electricity/930-content/about.html",
+      "allowed_hosts": [
+        "www.eia.gov",
+        "api.eia.gov"
+      ],
+      "access_status": "api_key_required",
+      "formats": [
+        "csv",
+        "json",
+        "xlsx",
+        "api"
+      ],
+      "acquisition_method": "http_api",
+      "release_identity": "Rolling; demand ~1h lag, generation ~1 day lag per snippets",
+      "license_attribution": "UNVERIFIED (federal publication; terms not read)",
+      "semantics": "BA-reported hourly demand, forecast, generation, interchange; revised after publication",
+      "units": "MW/MWh (UNVERIFIED which)",
+      "time_convention": "UTC and local periods both believed offered; interval convention UNVERIFIED",
+      "geography": "Balancing authority / region / sub-region",
+      "credential_env": [
+        "EIA_API_KEY"
+      ],
+      "limitations": [
+        "Balancing-authority reading is not site-specific headroom",
+        "Values may be revised; API returns values as strings per snippet"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/json"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "eia-api",
+      "name": "EIA Open Data API v2",
+      "owner": "U.S. Energy Information Administration",
+      "locator": "https://www.eia.gov/opendata/documentation.php",
+      "allowed_hosts": [
+        "www.eia.gov",
+        "api.eia.gov"
+      ],
+      "access_status": "api_key_required",
+      "formats": [
+        "json"
+      ],
+      "acquisition_method": "http_api",
+      "release_identity": "API v2",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Programmatic access to EIA datasets incl. electricity/rto",
+      "units": "per-dataset",
+      "time_convention": "UNVERIFIED",
+      "geography": "per-dataset",
+      "credential_env": [
+        "EIA_API_KEY"
+      ],
+      "limitations": [
+        "Row limits and rate limits UNVERIFIED",
+        "EIA_API_KEY is this harness's naming convention, not publisher-stated"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/json"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "ercot-data-portal",
+      "name": "ERCOT Public API / data portal",
+      "owner": "Electric Reliability Council of Texas",
+      "locator": "https://www.ercot.com/services/mdt/data-portal",
+      "allowed_hosts": [
+        "www.ercot.com",
+        "apiexplorer.ercot.com"
+      ],
+      "access_status": "registration_required",
+      "formats": [
+        "json",
+        "csv"
+      ],
+      "acquisition_method": "blocked",
+      "release_identity": "Public API history from 2023-12-11 per snippet",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Public market and grid reports",
+      "units": "UNVERIFIED",
+      "time_convention": "Believed Central Prevailing Time, hour-ending (UNVERIFIED)",
+      "geography": "ERCOT",
+      "credential_env": [
+        "ERCOT_SUBSCRIPTION_KEY",
+        "ERCOT_USERNAME",
+        "ERCOT_PASSWORD"
+      ],
+      "limitations": [
+        "API needs account, subscription key and bearer token per snippets",
+        "Ungated portal scope UNVERIFIED",
+        "Blocked until authorized access exists; no live data is fabricated"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "blocked_until_authorized",
+      "allowed_content_types": [],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "nrel-cambium",
+      "name": "NREL/NLR Cambium scenario viewer",
+      "owner": "National Laboratory of the Rockies (formerly NREL)",
+      "locator": "https://scenarioviewer.nlr.gov/?layout=Default&mode=download&project=5c7bef16-7e38-4094-92ce-8b03dfa93380",
+      "allowed_hosts": [
+        "scenarioviewer.nlr.gov",
+        "www.nlr.gov",
+        "data.openei.org"
+      ],
+      "access_status": "unverified",
+      "formats": [
+        "csv (UNVERIFIED)"
+      ],
+      "acquisition_method": "manual_download",
+      "release_identity": "Cambium 2024 per snippets; project id mapping UNVERIFIED",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "MODELED scenario data (marginal emissions/costs); never observed facts",
+      "units": "kg/MWh and $/MWh expected (UNVERIFIED)",
+      "time_convention": "UNVERIFIED",
+      "geography": "Model regions",
+      "credential_env": [],
+      "limitations": [
+        "Modeled, not observed",
+        "Viewer may need interactive session"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "openei-urdb",
+      "name": "OpenEI Utility Rate Database",
+      "owner": "OpenEI / NREL",
+      "locator": "https://apps.openei.org/services/doc/rest/util_rates/",
+      "allowed_hosts": [
+        "apps.openei.org",
+        "openei.org",
+        "api.openei.org"
+      ],
+      "access_status": "api_key_required",
+      "formats": [
+        "json",
+        "csv"
+      ],
+      "acquisition_method": "http_api",
+      "release_identity": "API versions latest, 3-7 per snippets",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Published tariff structures; crowd-sourced, not a site's contracted rate",
+      "units": "$/kWh, $/kW (UNVERIFIED)",
+      "time_convention": "TOU schedules as 12x24 matrices (UNVERIFIED)",
+      "geography": "US utilities",
+      "credential_env": [
+        "OPENEI_API_KEY"
+      ],
+      "limitations": [
+        "Generic tariff does not prove contracted rate or eligibility",
+        "OPENEI_API_KEY is this harness's naming convention"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/json"
+      ],
+      "max_bytes": 26214400
+    },
+    {
+      "id": "nws-api",
+      "name": "National Weather Service API",
+      "owner": "NOAA National Weather Service",
+      "locator": "https://www.weather.gov/documentation/services-web-api",
+      "allowed_hosts": [
+        "www.weather.gov",
+        "api.weather.gov"
+      ],
+      "access_status": "public",
+      "formats": [
+        "geojson",
+        "json-ld"
+      ],
+      "acquisition_method": "http_api",
+      "release_identity": "Rolling",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Observations and forecasts; weather context, not site cooling load",
+      "units": "SI/US per product (UNVERIFIED)",
+      "time_convention": "ISO 8601",
+      "geography": "US grid points",
+      "credential_env": [
+        "NWS_USER_AGENT"
+      ],
+      "limitations": [
+        "User-Agent header required per snippets",
+        "Weather is not a measured cooling load"
+      ],
+      "verification": {
+        "status": "search_snippet_only",
+        "checked_on": "2026-10-27",
+        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "application/geo+json",
+        "application/json"
+      ],
+      "max_bytes": 26214400
+    }
+  ]
+}
