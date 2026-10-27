@@ -21,3 +21,4 @@ data/generated/
 data/snapshots/
 out/
 audit-requirements.txt
+probe-report.json

@@ -1,0 +1,27 @@
+name: probe
+
+# Read-only verification of the registered publisher pages, run where outbound network exists.
+# Uses the harness's guarded fetch layer; no credentials, nothing stored, 3 MB cap, ERCOT stays blocked.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/optimistic-maxwell-izb5q8]
+    paths: [.github/workflows/probe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --all-groups
+      - name: Probe every registered source (exit 3 if any page could not be read)
+        run: uv run --locked gridforge-stress probe --all | tee probe-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-report
+          path: probe-report.json
