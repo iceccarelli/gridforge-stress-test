@@ -150,8 +150,8 @@ def fetch_source(
 ) -> tuple[bytes, Manifest]:
     """Fetch one registered source. Returns (body, manifest). Never raises secrets.
 
-    The manifest says `fetched_validated` only when status 200, content type and size checks all passed.
-    Content-level (parser) validation is a separate, later step and must not be skipped by callers.
+    The manifest says `fetched_unparsed`: transport checks passed (status 200, content type, size) but no
+    parser has looked at the content. Use `manifest.promote` after content validation to reach `fetched_validated`.
     """
     registry = sources if sources is not None else default_sources()
     source = registry.get(source_id)
@@ -223,7 +223,7 @@ def _follow(
             source_id=source.id,
             source_url=url,
             origin="live_fetch",
-            retrieval_status="fetched_validated",
+            retrieval_status="fetched_unparsed",
             attribution=str(source.raw["license_attribution"]),
             sha256=sha256_hex(resp.body),
             byte_count=len(resp.body),

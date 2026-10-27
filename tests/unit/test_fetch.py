@@ -29,10 +29,10 @@ def run(
     )
 
 
-def test_success_manifest_is_validated_and_checksummed():
+def test_success_manifest_is_checksummed_and_not_claimed_as_content_validated():
     reg = enable(SRC)
     body, man = run(reg, lambda *a: ok_response())
-    assert man.retrieval_status == "fetched_validated" and man.response_status == 200
+    assert man.retrieval_status == "fetched_unparsed" and man.response_status == 200
     assert man.byte_count == len(body) and len(man.sha256) == 64
     man.to_dict()  # schema-valid
 
@@ -131,7 +131,7 @@ def test_transient_errors_retry_with_backoff_then_succeed_and_are_bounded():
     seq = iter([F.Response(503, {}, b""), F.Response(429, {}, b""), ok_response()])
     sleeps: list[float] = []
     _, man = run(reg, lambda *a: next(seq), sleep=sleeps.append)
-    assert man.retrieval_status == "fetched_validated" and sleeps == [2.0, 4.0]
+    assert man.retrieval_status == "fetched_unparsed" and sleeps == [2.0, 4.0]
     calls = []
 
     def always_503(*a):

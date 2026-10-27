@@ -18,7 +18,8 @@ Time-to-Power product. It is NOT a second implementation of the product.
 ## Source-integrity rules (non-negotiable)
 1. A source is "verified" only if a publisher page was actually read; record `verification.status` honestly.
    `live_fetch` may be `enabled` only with `publisher_page_read`; gated sources (ERCOT) never enable.
-2. Never claim a fetch succeeded unless a real request passed validation. A failed fetch never overwrites a
+2. A download is `fetched_unparsed` (transport checks only); only `manifest.promote` after a content validator
+   with no errors yields `fetched_validated`. Never claim a fetch succeeded unless a real request passed validation. A failed fetch never overwrites a
    valid snapshot. Retrieval status is separate from availability assumptions.
 3. Acquisition takes registered source IDs only: https, port 443, registered host, public IPs only, capped
    size/time/redirects, content-type check, redacted credentials. Never add a "fetch any URL" path.
@@ -30,7 +31,7 @@ Time-to-Power product. It is NOT a second implementation of the product.
 
 ## Integration boundary
 Product is `../GridForge-AI` (override with `GRIDFORGE_PRODUCT_DIR`). Call only its real handlers
-(`gridforge.api.server.handle_compare`). Product changes go on a feature branch, never `main`.
+(`/v1/compare`, `/v1/screen`, `/v1/diff` via `product_adapter.call`). Product changes go on a feature branch, never `main`.
 
 ## Branch safety
 No force-push, reset --hard, clean, or stash. Do not merge PRs. Do not choose a licence for the owner.

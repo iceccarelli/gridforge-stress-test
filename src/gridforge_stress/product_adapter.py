@@ -20,11 +20,11 @@ _RUNNER = r"""
 import json, os, sys
 sys.path.insert(0, sys.argv[1])
 os.environ["GRIDFORGE_REPORT_DATE"] = sys.argv[2]
-from gridforge.api.server import _invoke, handle_compare
+from gridforge.api import server
 from gridforge.api.tiers import Tier
 req = json.load(sys.stdin)
 try:
-    out = _invoke("/v1/compare", handle_compare, req, Tier.CLIENT)
+    out = server._invoke(sys.argv[3], getattr(server, sys.argv[4]), req, Tier(sys.argv[5]))
     json.dump({"ok": True, "result": out}, sys.stdout, default=str)
 except Exception as exc:  # report the product's refusal verbatim, do not mask it
     json.dump({"ok": False, "error": type(exc).__name__, "message": str(exc)}, sys.stdout)
@@ -51,20 +51,26 @@ def product_dir() -> Path:
     return p
 
 
-def compare(
-    intake: dict[str, Any],
+ENDPOINTS = {
+    "compare": ("/v1/compare", "handle_compare"),
+    "screen": ("/v1/screen", "handle_screen"),
+    "diff": ("/v1/diff", "handle_diff"),
+}
+
+
+def call(
+    endpoint: str,
+    body: dict[str, Any],
     *,
+    tier: str = "client",
     report_date: str = "2026-10-27",
-    scenarios: list[str] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
-    """Run the product's compare endpoint handler. Returns {'ok': bool, 'result'|'error'...}."""
+    """Run a real product endpoint handler. Returns {'ok': bool, 'result'|'error'|'message'}."""
     root = root or product_dir()
-    body: dict[str, Any] = {"intake": intake}
-    if scenarios:
-        body["scenarios"] = scenarios
+    route, handler = ENDPOINTS[endpoint]
     proc = subprocess.run(  # noqa: S603
-        [sys.executable, "-I", "-c", _RUNNER, str(root), report_date],
+        [sys.executable, "-I", "-c", _RUNNER, str(root), report_date, route, handler, tier],
         input=json.dumps(body),
         capture_output=True,
         text=True,
@@ -76,6 +82,20 @@ def compare(
         raise ProductUnavailable(f"product runner failed: {proc.stderr[-400:]}")
     parsed: dict[str, Any] = json.loads(proc.stdout)
     return parsed
+
+
+def compare(
+    intake: dict[str, Any],
+    *,
+    report_date: str = "2026-10-27",
+    scenarios: list[str] | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Run the product's /v1/compare handler on an intake."""
+    body: dict[str, Any] = {"intake": intake}
+    if scenarios:
+        body["scenarios"] = scenarios
+    return call("compare", body, report_date=report_date, root=root)
 
 
 def claim_violations(output: dict[str, Any], evidence_level: str) -> list[str]:

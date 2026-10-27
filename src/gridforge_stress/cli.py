@@ -65,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         print(
             json.dumps(man.to_dict(), indent=2),
-            f"\n{len(body)} bytes (parser validation still required)",
+            f"\n{len(body)} bytes (NOT stored: transport checks only; no content validator has run)",
         )
         return 0
     return 2
