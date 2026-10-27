@@ -9,6 +9,19 @@ from typing import Any
 
 from .findings import Finding
 
+#: EIA-930 (publisher page read 2026-10-27): hourly data use the hour-ENDING convention, in each BA's chosen local time.
+EIA930_CONVENTION = "hour-ending"
+
+
+def interval_start(stamp: datetime, convention: str) -> datetime:
+    """Start of the hour a timestamp labels. Hour-ending stamps label the hour that ENDS at the stamp."""
+    if convention == "hour-ending":
+        return stamp - timedelta(hours=1)
+    if convention == "hour-beginning":
+        return stamp
+    raise ValueError(f"unknown interval convention {convention!r}")
+
+
 SCOPE_LABEL = "balancing-authority-level reading; not evidence of site-specific headroom"
 
 

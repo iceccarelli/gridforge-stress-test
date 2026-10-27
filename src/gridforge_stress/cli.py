@@ -77,18 +77,39 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _probe(source_id: str | None, everything: bool) -> int:
-    from .fetch import FetchError, probe_source
+    from .fetch import FetchBlocked, FetchError, probe_source
     from .probe import summarize
 
-    ids = list(load_sources()) if everything else [source_id or ""]
+    registry = load_sources()
+    ids = list(registry) if everything else [source_id or ""]
     failures = 0
     for sid in ids:
-        try:
-            body, man, headers = probe_source(sid)
-            print(json.dumps(summarize(man, headers, body), indent=1, ensure_ascii=False))
-        except FetchError as exc:
-            failures += 1
-            print(json.dumps({"source_id": sid, "probe": "NOT_READ", "reason": str(exc)}))
+        src = registry.get(sid)
+        targets: list[str | None] = [None]
+        if src is not None:
+            targets += list(src.probe_urls)
+        for target in targets:
+            try:
+                body, man, headers = probe_source(sid, url=target)
+                print(json.dumps(summarize(man, headers, body), indent=1, ensure_ascii=False))
+            except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
+                print(
+                    json.dumps(
+                        {
+                            "source_id": sid,
+                            "url": target,
+                            "probe": "BLOCKED_BY_POLICY",
+                            "reason": str(exc),
+                        }
+                    )
+                )
+            except FetchError as exc:
+                failures += 1
+                print(
+                    json.dumps(
+                        {"source_id": sid, "url": target, "probe": "NOT_READ", "reason": str(exc)}
+                    )
+                )
     return 0 if failures == 0 else 3
 
 

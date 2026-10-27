@@ -256,6 +256,7 @@ PROBE_MAX_BYTES = 3_000_000
 def probe_source(
     source_id: str,
     *,
+    url: str | None = None,
     resolver: Resolver = system_resolver,
     transport: Transport = default_transport,
     sources: Mapping[str, Source] | None = None,
@@ -273,11 +274,13 @@ def probe_source(
         raise FetchBlocked(f"unknown source id {source_id!r}; arbitrary URLs are not accepted")
     if source.live_fetch == "blocked_until_authorized":
         raise FetchBlocked(f"{source_id} is blocked until authorized access exists")
+    if url is not None and url != source.locator and url not in source.probe_urls:
+        raise FetchBlocked("probe may only read the locator or a registered probe_urls entry")
     deadline = time.monotonic() + TOTAL_TIMEOUT_S
     try:
         return _follow(
             source,
-            source.locator,
+            url or source.locator,
             resolver,
             transport,
             deadline,

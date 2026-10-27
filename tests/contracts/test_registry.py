@@ -19,10 +19,29 @@ def test_registry_and_catalogue_valid():
     assert {s["id"] for s in load_scenarios()} == {f"GF-00{i}" for i in range(1, 9)}
 
 
-def test_no_source_claims_unread_pages_as_verified():
+def test_verified_claims_cite_evidence_and_nothing_is_live_yet():
     for s in load_sources().values():
-        assert s.raw["verification"]["status"] != "publisher_page_read", s.id
+        v = s.raw["verification"]
+        if v["status"] == "publisher_page_read":
+            assert "run" in v["basis"] and "read" in v["basis"], s.id
         assert s.live_fetch != "enabled", s.id
+
+
+def test_unread_sources_stay_unverified():
+    reg = load_sources()
+    for sid in ("lbnl-queued-up", "caiso-pge-c16-poi", "ercot-data-portal", "nrel-cambium"):
+        assert reg[sid].raw["verification"]["status"] != "publisher_page_read", sid
+
+
+def test_probe_urls_must_stay_on_registered_hosts(tmp_path):
+    import json
+
+    doc = json.loads((configs_dir() / "sources.json").read_text())
+    doc["sources"][0]["probe_urls"] = ["https://evil.example/x"]
+    p = tmp_path / "s.json"
+    p.write_text(json.dumps(doc))
+    with pytest.raises(RegistryError):
+        load_sources(p)
 
 
 def test_ercot_blocked_and_registration_gated():

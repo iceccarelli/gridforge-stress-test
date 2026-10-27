@@ -4,7 +4,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from gridforge_stress.hourly import SCOPE_LABEL, forecast_error, validate_hourly
+from gridforge_stress.hourly import (
+    EIA930_CONVENTION,
+    SCOPE_LABEL,
+    forecast_error,
+    interval_start,
+    validate_hourly,
+)
 
 pytestmark = pytest.mark.unit
 NOW = datetime(2026, 3, 9, 0, tzinfo=UTC)
@@ -63,3 +69,11 @@ def test_forecast_vs_actual_reports_coverage_and_scope():
     assert out["intervals_compared"] == 2 and out["forecast_only"] == 1
     assert out["mean_error"] == 15 and out["scope"] == SCOPE_LABEL
     assert forecast_error([], [])["mean_error"] is None
+
+
+def test_hour_ending_stamp_labels_the_previous_hour():
+    stamp = datetime(2026, 3, 8, 7, tzinfo=UTC)
+    assert interval_start(stamp, EIA930_CONVENTION) == datetime(2026, 3, 8, 6, tzinfo=UTC)
+    assert interval_start(stamp, "hour-beginning") == stamp
+    with pytest.raises(ValueError):
+        interval_start(stamp, "midpoint")

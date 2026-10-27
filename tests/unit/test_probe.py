@@ -90,3 +90,35 @@ def test_summary_extracts_evidence_and_labels_non_text():
         "lbnl-queued-up", resolver=PUB, transport=lambda *a: ok(b"%PDF", "application/pdf")
     )
     assert "not parsed" in summarize(man2, h2, b"%PDF")["note"]
+
+
+def test_probe_urls_are_allowed_but_arbitrary_urls_are_not():
+    reg = load_sources()
+    extra = reg["lbnl-queued-up"].probe_urls[0]
+    F.probe_source(
+        "lbnl-queued-up", url=extra, resolver=PUB, transport=lambda *a: ok(), sources=reg
+    )
+    for bad in (
+        "https://emp.lbl.gov/other",
+        "https://169.254.169.254/",
+        "http://emp.lbl.gov/queues",
+    ):
+        with pytest.raises(F.FetchBlocked):
+            F.probe_source(
+                "lbnl-queued-up", url=bad, resolver=PUB, transport=lambda *a: ok(), sources=reg
+            )
+
+
+def test_cli_probe_treats_policy_block_as_expected_but_read_failure_as_failure(capsys, monkeypatch):
+    from gridforge_stress import cli
+
+    def refuse(sid, url=None, **kw):
+        if sid == "ercot-data-portal":
+            raise F.FetchBlocked("blocked until authorized access exists")
+        raise F.FetchFailed("HTTP 403")
+
+    monkeypatch.setattr(F, "probe_source", refuse)
+    assert cli.main(["probe", "ercot-data-portal"]) == 0
+    assert "BLOCKED_BY_POLICY" in capsys.readouterr().out
+    assert cli.main(["probe", "eia-930"]) == 3
+    assert "NOT_READ" in capsys.readouterr().out

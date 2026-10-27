@@ -101,10 +101,17 @@ def run_doctor(env: Mapping[str, str] | None = None) -> dict[str, Any]:
             "pass" if state == "set" else "absent",
             state + " (value never shown)",
         )
-    add(
-        "live_sources",
-        "info",
-        "none verified: no publisher page has been read by this harness; live fetch is disabled for all sources",
-    )
+    try:
+        srcs = default_sources().values()
+        read = [x.id for x in srcs if x.raw["verification"]["status"] == "publisher_page_read"]
+        enabled = [x.id for x in srcs if x.live_fetch == "enabled"]
+        add(
+            "live_sources",
+            "info",
+            f"publisher page read for {len(read)}/{len(srcs)} sources ({', '.join(read) or 'none'}); "
+            f"live fetch enabled for {len(enabled)}; nothing has been parsed from a live download",
+        )
+    except RegistryError:
+        pass
     healthy = all(c["status"] != "fail" for c in checks)
     return {"healthy": healthy, "checks": checks}
