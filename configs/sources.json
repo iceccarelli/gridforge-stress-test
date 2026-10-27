@@ -12,27 +12,27 @@
       ],
       "access_status": "public",
       "formats": [
-        "xlsx (UNVERIFIED)",
+        "xlsx",
         "pdf"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "Queued Up 2026 Edition, data through end of 2025 (publication month conflicting in sources)",
-      "license_attribution": "CC BY 4.0; attribute LBNL and GridTracker (wording UNVERIFIED)",
-      "semantics": "Project-level interconnection queue requests; snapshot, not a forecast",
+      "release_identity": "Queued Up: 2026 Edition, Characteristics of Power Plants Seeking Transmission Interconnection As of the End of 2025. Publication page (eta-publications.lbl.gov) Last-Modified 2026-10-27. Data file path /sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx; report PDF /sites/default/files/2026-06/queued_up_2026_edition.pdf. Page text: ~8,200 projects actively seeking grid connection as of end of 2025.",
+      "license_attribution": "Page text: 'The Queued Up data file is licensed CC BY 4.0. You may use, share, or adapt the dataset as long as you attribute it to Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker.'",
+      "semantics": "Project-level interconnection queue data file for projects seeking transmission interconnection as of end of 2025 (publisher description)",
       "units": "UNVERIFIED (MW expected)",
       "time_convention": "UNVERIFIED",
       "geography": "US, project level, by ISO/utility",
       "credential_env": [],
       "limitations": [
-        "Snapshot only; later activity absent",
+        "Data as of end of 2025: a snapshot, not a forecast",
         "Queue statistic is not a data-centre load-connection probability",
-        "Workbook link, sheet names and codebook not verified",
-        "emp.lbl.gov returned HTTP 403 to the harness's automated request on 2026-10-27 (probe run 40578807015): automated access may be blocked; manual download may be required"
+        "emp.lbl.gov (incl. /queues) returns HTTP 403 to automated requests (probe run 40579353392); eta-publications.lbl.gov serves the same publication page",
+        "Workbook not yet downloaded: size, sheet names, columns, codebook and units are UNVERIFIED"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "emp.lbl.gov/queues returned HTTP 403 in probe run 40578807015; nothing was read. Fields remain from search snippets"
+        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) via GitHub Actions probe run 40579353392 (2026-10-27): title, licence wording and data-file link taken from the page. The locator emp.lbl.gov/queues itself returned HTTP 403 and was NOT read."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
@@ -41,8 +41,8 @@
       ],
       "max_bytes": 26214400,
       "probe_urls": [
-        "https://emp.lbl.gov/publications/queued-2026-edition-characteristics",
-        "https://eta-publications.lbl.gov/publications/us-interconnection-queue-data-0"
+        "https://eta-publications.lbl.gov/publications/us-interconnection-queue-data-0",
+        "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx"
       ]
     },
     {
@@ -263,7 +263,7 @@
         "csv (UNVERIFIED)"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "Cambium 2024 per snippets; project id mapping UNVERIFIED",
+      "release_identity": "Cambium 2024 release (fifth annual edition) per www.nlr.gov/analysis/cambium; the release includes three products, one being the Scenario Viewer with the full 2024 datasets for viewing and download. Whether the registered viewer project id maps to the 2024 release is UNVERIFIED.",
       "license_attribution": "UNVERIFIED",
       "semantics": "MODELED scenario data (marginal emissions/costs); never observed facts",
       "units": "kg/MWh and $/MWh expected (UNVERIFIED)",
@@ -271,13 +271,15 @@
       "geography": "Model regions",
       "credential_env": [],
       "limitations": [
-        "The URL is an interactive Scenario Viewer app shell (title 'Scenario Viewer'); no release, licence, units or download links appear in the static HTML",
-        "Modeled, not observed"
+        "The registered viewer URL is an interactive app shell (no fields in static HTML); release identity comes from the official sibling page www.nlr.gov/analysis/cambium",
+        "Licence, units, time resolution and geography wording not found on the pages read",
+        "Modeled, not observed",
+        "Publications listed on the page: docs/fy24osti/88507.pdf, fy25osti/92256.pdf, fy25osti/93005.pdf (not read)"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "Page fetched (HTTP 200, 27,488 bytes) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27) but is a JavaScript app shell with no field evidence; release/licence/units remain from search snippets"
+        "basis": "Official sibling page www.nlr.gov/analysis/cambium read (HTTP 200, 29,850 bytes) via GitHub Actions probe run 40579353392 (2026-10-27): release edition and product list taken from it. The registered viewer URL was fetched (HTTP 200, 27,488 bytes) but is a JavaScript shell with no field evidence."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [],

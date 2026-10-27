@@ -29,7 +29,7 @@ def test_verified_claims_cite_evidence_and_nothing_is_live_yet():
 
 def test_unread_sources_stay_unverified():
     reg = load_sources()
-    for sid in ("lbnl-queued-up", "caiso-pge-c16-poi", "ercot-data-portal", "nrel-cambium"):
+    for sid in ("caiso-pge-c16-poi", "ercot-data-portal"):
         assert reg[sid].raw["verification"]["status"] != "publisher_page_read", sid
 
 
@@ -74,7 +74,9 @@ def _mutate(tmp_path, fn):
         lambda d: d["sources"][0].pop("limitations"),
         lambda d: d["sources"][0].update(locator="http://emp.lbl.gov/queues"),
         lambda d: d["sources"][0].update(allowed_hosts=["other.example"]),
-        lambda d: d["sources"][0].update(live_fetch="enabled"),
+        lambda d: next(x for x in d["sources"] if x["id"] == "caiso-pge-c16-poi").update(
+            live_fetch="enabled"
+        ),
         lambda d: d["sources"][0].update(access_status="made_up"),
         lambda d: d["sources"][0].update(unexpected="x"),
     ],
@@ -107,3 +109,14 @@ def test_gitignore_excludes_raw_data_credentials_and_generated():
     gi = (ROOT / ".gitignore").read_text()
     for needle in (".env", "data/raw/", "data/generated/", ".venv/"):
         assert needle in gi
+
+
+def test_lbnl_registry_states_what_was_and_was_not_read():
+    lbnl = load_sources()["lbnl-queued-up"]
+    basis = lbnl.raw["verification"]["basis"]
+    assert "403" in basis and "NOT read" in basis
+    assert any("UNVERIFIED" in x and "sheet" in x for x in lbnl.raw["limitations"])
+    assert (
+        "CC BY 4.0" in lbnl.raw["license_attribution"]
+        and "GridTracker" in lbnl.raw["license_attribution"]
+    )

@@ -202,3 +202,45 @@ def test_gated_source_cannot_be_enabled():
 
 def test_redact():
     assert F.redact("a SECRET b", {"K": "SECRET"}) == "a [REDACTED] b"
+
+
+def test_unreachable_first_address_falls_back_to_next_validated_one_ipv4_first():
+    reg = enable(SRC)
+    tried = []
+
+    def flaky(ip, *a):
+        tried.append(ip)
+        if ":" in ip:
+            raise OSError(101, "Network is unreachable")
+        return ok_response()
+
+    _, man = run(reg, flaky, resolver=lambda h: ["2606:4700::1111", "93.184.216.34"])
+    assert tried == ["93.184.216.34"] and man.response_status == 200
+
+
+def test_fallback_never_reaches_unvalidated_addresses():
+    reg = enable(SRC)
+    with pytest.raises(F.FetchBlocked):
+        run(
+            reg,
+            lambda *a: pytest.fail("connected"),
+            resolver=lambda h: ["2606:4700::1111", "10.0.0.9"],
+        )
+
+
+def test_all_addresses_failing_is_a_failure_not_a_success():
+    reg = enable(SRC)
+
+    def down(*a):
+        raise OSError(101, "Network is unreachable")
+
+    with pytest.raises(F.FetchFailed):
+        run(reg, down, resolver=lambda h: ["93.184.216.34", "2606:4700::1111"])
+
+
+def test_declared_length_over_cap_is_refused_before_any_body_is_read():
+    with pytest.raises(F.FetchFailed, match="declares 99999999"):
+        F.check_declared_length({"content-length": "99999999"}, 3_000_000)
+    F.check_declared_length({"content-length": "100"}, 3_000_000)
+    F.check_declared_length({}, 3_000_000)
+    F.check_declared_length({"content-length": "not-a-number"}, 3_000_000)

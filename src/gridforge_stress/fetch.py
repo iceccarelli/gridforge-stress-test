@@ -81,6 +81,13 @@ class Transport(Protocol):
     ) -> Response: ...
 
 
+def check_declared_length(headers: Mapping[str, str], cap: int) -> None:
+    """Refuse before reading the body when the server already says it is larger than the cap."""
+    declared = headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > cap:
+        raise FetchFailed(f"download exceeds cap of {cap} bytes (server declares {declared} bytes)")
+
+
 class _PinnedHTTPS(http.client.HTTPSConnection):
     """Connects to a pre-validated IP while keeping SNI and certificate checks on the hostname."""
 
@@ -102,6 +109,7 @@ def default_transport(
     try:
         conn.request("GET", target, headers={"Host": host, **headers})
         resp = conn.getresponse()
+        check_declared_length({k.lower(): v for k, v in resp.getheaders()}, max_bytes)
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -208,7 +216,7 @@ def _follow(
         if not ips or not all(_is_public(ip) for ip in ips):
             raise FetchBlocked(f"{host} resolves to a non-public address; refusing")
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
-        resp = transport(ips[0], host, target, {"User-Agent": USER_AGENT}, cap, deadline)
+        resp = _first_reachable(ips, host, target, transport, cap, deadline)
         if resp.status in (301, 302, 303, 307, 308):
             location = resp.headers.get("location")
             if not location:
@@ -242,6 +250,20 @@ def _follow(
         )
         return resp.body, manifest, resp.headers
     raise FetchFailed("too many redirects")
+
+
+def _first_reachable(
+    ips: list[str], host: str, target: str, transport: Transport, cap: int, deadline: float
+) -> Response:
+    """Try each already-validated public address, IPv4 first (runners often lack an IPv6 route)."""
+    ordered = sorted(ips, key=lambda ip: ":" in ip)
+    last: OSError | None = None
+    for ip in ordered:
+        try:
+            return transport(ip, host, target, {"User-Agent": USER_AGENT}, cap, deadline)
+        except OSError as exc:  # connect/route failure: try the next validated address
+            last = exc
+    raise last if last is not None else FetchFailed("no address to connect to")
 
 
 def _join(base: str, location: str) -> str:
