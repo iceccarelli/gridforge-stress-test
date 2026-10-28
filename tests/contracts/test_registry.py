@@ -19,10 +19,29 @@ def test_registry_and_catalogue_valid():
     assert {s["id"] for s in load_scenarios()} == {f"GF-00{i}" for i in range(1, 9)}
 
 
-def test_no_source_claims_unread_pages_as_verified():
+def test_verified_claims_cite_evidence_and_nothing_is_live_yet():
     for s in load_sources().values():
-        assert s.raw["verification"]["status"] != "publisher_page_read", s.id
+        v = s.raw["verification"]
+        if v["status"] == "publisher_page_read":
+            assert "run" in v["basis"] and "read" in v["basis"], s.id
         assert s.live_fetch != "enabled", s.id
+
+
+def test_unread_sources_stay_unverified():
+    reg = load_sources()
+    for sid in ("caiso-pge-c16-poi", "ercot-data-portal"):
+        assert reg[sid].raw["verification"]["status"] != "publisher_page_read", sid
+
+
+def test_probe_urls_must_stay_on_registered_hosts(tmp_path):
+    import json
+
+    doc = json.loads((configs_dir() / "sources.json").read_text())
+    doc["sources"][0]["probe_urls"] = ["https://evil.example/x"]
+    p = tmp_path / "s.json"
+    p.write_text(json.dumps(doc))
+    with pytest.raises(RegistryError):
+        load_sources(p)
 
 
 def test_ercot_blocked_and_registration_gated():
@@ -55,7 +74,9 @@ def _mutate(tmp_path, fn):
         lambda d: d["sources"][0].pop("limitations"),
         lambda d: d["sources"][0].update(locator="http://emp.lbl.gov/queues"),
         lambda d: d["sources"][0].update(allowed_hosts=["other.example"]),
-        lambda d: d["sources"][0].update(live_fetch="enabled"),
+        lambda d: next(x for x in d["sources"] if x["id"] == "caiso-pge-c16-poi").update(
+            live_fetch="enabled"
+        ),
         lambda d: d["sources"][0].update(access_status="made_up"),
         lambda d: d["sources"][0].update(unexpected="x"),
     ],
@@ -88,3 +109,14 @@ def test_gitignore_excludes_raw_data_credentials_and_generated():
     gi = (ROOT / ".gitignore").read_text()
     for needle in (".env", "data/raw/", "data/generated/", ".venv/"):
         assert needle in gi
+
+
+def test_lbnl_registry_states_what_was_and_was_not_read():
+    lbnl = load_sources()["lbnl-queued-up"]
+    basis = lbnl.raw["verification"]["basis"]
+    assert "403" in basis and "NOT read" in basis
+    assert any("UNVERIFIED" in x and "sheet" in x for x in lbnl.raw["limitations"])
+    assert (
+        "CC BY 4.0" in lbnl.raw["license_attribution"]
+        and "GridTracker" in lbnl.raw["license_attribution"]
+    )

@@ -61,6 +61,10 @@ class Source:
         return str(self.raw["locator"])
 
     @property
+    def probe_urls(self) -> tuple[str, ...]:
+        return tuple(self.raw.get("probe_urls", ()))
+
+    @property
     def max_bytes(self) -> int:
         return int(self.raw.get("max_bytes", 5_000_000))
 
@@ -79,6 +83,9 @@ def load_sources(path: Path | None = None) -> dict[str, Source]:
         host = rec["locator"].split("/")[2].split(":")[0].lower()
         if host not in rec["allowed_hosts"]:
             raise RegistryError(f"{rec['id']}: locator host {host} not in allowed_hosts")
+        for extra in rec.get("probe_urls", []):
+            if extra.split("/")[2].split(":")[0].lower() not in rec["allowed_hosts"]:
+                raise RegistryError(f"{rec['id']}: probe url host not in allowed_hosts: {extra}")
         if (
             rec["access_status"] in {"registration_required", "restricted"}
             and rec["live_fetch"] == "enabled"

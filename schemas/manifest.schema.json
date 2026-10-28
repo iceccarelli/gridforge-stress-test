@@ -13,7 +13,7 @@
     "source_url": {"type": "string"},
     "origin": {"enum": ["live_fetch", "source_derived_fixture", "synthetic_fixture"]},
     "retrieved_at": {"type": ["string", "null"]},
-    "retrieval_status": {"enum": ["fetched_validated", "fetched_failed_validation", "fetch_failed", "not_attempted", "synthetic"]},
+    "retrieval_status": {"enum": ["fetched_unparsed", "fetched_validated", "fetched_failed_validation", "fetch_failed", "not_attempted", "synthetic"]},
     "response_status": {"type": ["integer", "null"]},
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "byte_count": {"type": "integer", "minimum": 0},

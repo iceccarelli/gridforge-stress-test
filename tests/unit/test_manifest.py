@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from gridforge_stress.manifest import commit_snapshot, manifest_for_bytes
+from gridforge_stress.findings import Finding
+from gridforge_stress.manifest import commit_snapshot, manifest_for_bytes, promote
 from gridforge_stress.registry import RegistryError
 
 pytestmark = pytest.mark.unit
@@ -43,3 +44,18 @@ def test_checksum_mismatch_rejected(tmp_path):
 def test_no_temp_files_left(tmp_path):
     commit_snapshot(tmp_path, "s", b"abc", mk(b"abc"))
     assert not [p for p in tmp_path.iterdir() if p.name.startswith(".tmp-")]
+
+
+def test_unparsed_download_cannot_be_stored_until_content_validated(tmp_path):
+    m = mk(b"abc", status="fetched_unparsed")
+    with pytest.raises(RegistryError):
+        commit_snapshot(tmp_path, "s", b"abc", m)
+    bad = promote(m, [Finding("bad_value", "x")])
+    assert bad.retrieval_status == "fetched_failed_validation"
+    with pytest.raises(RegistryError):
+        commit_snapshot(tmp_path, "s", b"abc", bad)
+    good = promote(m, [Finding("revision", "x", "warning")])
+    assert good.retrieval_status == "fetched_validated"
+    commit_snapshot(tmp_path, "s", b"abc", good)
+    with pytest.raises(RegistryError):
+        promote(good, [])

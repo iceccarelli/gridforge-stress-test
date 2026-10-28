@@ -12,33 +12,38 @@
       ],
       "access_status": "public",
       "formats": [
-        "xlsx (UNVERIFIED)",
+        "xlsx",
         "pdf"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "Queued Up 2026 Edition, data through end of 2025 (publication month conflicting in sources)",
-      "license_attribution": "CC BY 4.0; attribute LBNL and GridTracker (wording UNVERIFIED)",
-      "semantics": "Project-level interconnection queue requests; snapshot, not a forecast",
+      "release_identity": "Queued Up: 2026 Edition, Characteristics of Power Plants Seeking Transmission Interconnection As of the End of 2025. Data file path /sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx on eta-publications.lbl.gov; server declares 15,571,236 bytes (Content-Length, GitHub Actions probe run 40580149328; not downloaded). Report PDF /sites/default/files/2026-06/queued_up_2026_edition.pdf. Page text: ~8,200 projects actively seeking grid connection as of end of 2025. The publication page's Last-Modified header differed between two reads on 2026-10-27, so it is not used as a release date.",
+      "license_attribution": "Page text: 'The Queued Up data file is licensed CC BY 4.0. You may use, share, or adapt the dataset as long as you attribute it to Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker.'",
+      "semantics": "Project-level interconnection queue data file for projects seeking transmission interconnection as of end of 2025 (publisher description)",
       "units": "UNVERIFIED (MW expected)",
       "time_convention": "UNVERIFIED",
       "geography": "US, project level, by ISO/utility",
       "credential_env": [],
       "limitations": [
-        "Snapshot only; later activity absent",
+        "Data as of end of 2025: a snapshot, not a forecast",
         "Queue statistic is not a data-centre load-connection probability",
-        "Workbook link, sheet names and codebook not verified"
+        "emp.lbl.gov (incl. /queues) returns HTTP 403 to automated requests (probe run 40579353392); eta-publications.lbl.gov serves the same publication page",
+        "Workbook not yet downloaded: declared size 15,571,236 bytes (above the 3 MB probe cap, below the 25 MB registry cap); sheet names, columns, codebook and units are UNVERIFIED"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) in GitHub Actions probe run 40579353392 and again in GitHub Actions probe run 40580149328: title, licence wording and data-file link taken from the page; workbook Content-Length from GitHub Actions probe run 40580149328. The locator emp.lbl.gov/queues returned HTTP 403 in both runs and was NOT read."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/pdf"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": [
+        "https://eta-publications.lbl.gov/publications/us-interconnection-queue-data-0",
+        "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx"
+      ]
     },
     {
       "id": "caiso-facility-library",
@@ -48,32 +53,36 @@
       "allowed_hosts": [
         "www.caiso.com"
       ],
-      "access_status": "unverified",
+      "access_status": "public",
       "formats": [
-        "UNVERIFIED"
+        "html",
+        "pdf",
+        "xlsx"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "UNVERIFIED",
+      "release_identity": "Library page lists 14 documents, incl. Cluster 16 restricted POI information (pdf), PG&E C16 POI availability (pdf), generator interconnection resource ID report (xlsx), local capacity deficiencies bus bar C16 (xlsx), FERC 845 study statistics (pdf)",
       "license_attribution": "UNVERIFIED",
-      "semantics": "Interconnection facility information",
+      "semantics": "Index page of CAISO interconnection facility documents; each linked document needs its own verification",
       "units": "UNVERIFIED",
       "time_convention": "UNVERIFIED",
       "geography": "CAISO footprint",
       "credential_env": [],
       "limitations": [
-        "Page contents not read"
+        "Index page only: linked documents not read",
+        "No licence or attribution wording found on the page"
       ],
       "verification": {
-        "status": "unverified",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "Publisher host unreachable from the build sandbox; nothing read. Fields are placeholders to verify."
+        "basis": "HTML page read (HTTP 200, 70,868 bytes) in GitHub Actions runs 40578807015, 40579353392 (this one failed on IPv6 'Network is unreachable', fixed) and 40580149328 (all 2026-10-27); title and document links extracted; licence/units/time not stated on the page"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "text/html",
         "application/pdf"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "caiso-pge-c16-poi",
@@ -88,7 +97,7 @@
         "pdf"
       ],
       "acquisition_method": "http_download",
-      "release_identity": "Notice dated 2026-01-15 per search snippet; PDF version UNVERIFIED",
+      "release_identity": "PDF served by CAISO: Last-Modified 2026-01-16T21:19:52Z, 124,677 bytes, ETag be8341f5f57cadba310f663727dea697, content sha256 10362930568a770e671005ec3c27c0ac3d39f6a807a6a7c2882b0ce284d8b511 identical in GitHub Actions probe run 40579353392 and GitHub Actions probe run 40580149328 (2026-10-27); contents not yet parsed",
       "license_attribution": "UNVERIFIED",
       "semantics": "Informational POI availability tables (restricted POIs; POIs open with complex upgrades); a listing is not an allocation",
       "units": "kV, kA, USD (partly from snippets)",
@@ -98,18 +107,21 @@
       "limitations": [
         "Informational only; tables may change after the notice",
         "PDF table extraction not validated",
-        "Candidate or open POI is not a confirmed allocation"
+        "Candidate or open POI is not a confirmed allocation",
+        "Only HTTP headers of the PDF have been read; table contents unverified",
+        "Sibling document: cluster-16-restricted-point-of-interconnection-poi-information.pdf (listed in the facility library)"
       ],
       "verification": {
         "status": "search_snippet_only",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "Existence, content type and Last-Modified confirmed from GitHub Actions run 40578807015 (probe workflow, 2026-10-27); PDF text not extracted, so content-level fields remain from search snippets"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/pdf"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "eia-930",
@@ -122,35 +134,38 @@
       ],
       "access_status": "api_key_required",
       "formats": [
+        "xlsx (reference tables, annual layouts)",
         "csv",
         "json",
-        "xlsx",
         "api"
       ],
       "acquisition_method": "http_api",
       "release_identity": "Rolling; demand ~1h lag, generation ~1 day lag per snippets",
       "license_attribution": "UNVERIFIED (federal publication; terms not read)",
-      "semantics": "BA-reported hourly demand, forecast, generation, interchange; revised after publication",
+      "semantics": "BA-reported hourly electricity demand, demand forecast, net generation and interchange as published by EIA; page documents data quality issues, imputation, pseudo-ties and generation-only BAs",
       "units": "MW/MWh (UNVERIFIED which)",
-      "time_convention": "UTC and local periods both believed offered; interval convention UNVERIFIED",
-      "geography": "Balancing authority / region / sub-region",
+      "time_convention": "Hour-ending: data for the hour ending 1:00 a.m. is reported with a 1:00 a.m. timestamp; values are time-weighted hourly averages; BA data are published in the local time zone chosen by each BA (page has DST reporting and imputation sections). Whether the API also exposes UTC periods is not stated on this page.",
+      "geography": "Balancing authorities (reporting entities), with regional and sub-regional aggregations per page sections",
       "credential_env": [
         "EIA_API_KEY"
       ],
       "limitations": [
-        "Balancing-authority reading is not site-specific headroom",
-        "Values may be revised; API returns values as strings per snippet"
+        "Region/BA-level reading is not site-specific headroom",
+        "Values may be imputed or revised; see page sections on data quality and imputation",
+        "Timestamps are hour-ending in BA-chosen local time on the published page: DST days need explicit handling",
+        "Units and licence wording not stated on this page"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "HTML page read (HTTP 200, 44,997 bytes, Last-Modified 2026-10-02) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27); time convention and section list taken from the page text"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/json"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "eia-api",
@@ -166,9 +181,9 @@
         "json"
       ],
       "acquisition_method": "http_api",
-      "release_identity": "API v2",
+      "release_identity": "API v2 (v1 deprecated per page); patch notes listed; documentation PDFs APIv2.0.1 and APIv2.1.0",
       "license_attribution": "UNVERIFIED",
-      "semantics": "Programmatic access to EIA datasets incl. electricity/rto",
+      "semantics": "REST API; key passed as api_key query parameter; free key by registration, emailed to the registrant",
       "units": "per-dataset",
       "time_convention": "UNVERIFIED",
       "geography": "per-dataset",
@@ -176,19 +191,21 @@
         "EIA_API_KEY"
       ],
       "limitations": [
-        "Row limits and rate limits UNVERIFIED",
-        "EIA_API_KEY is this harness's naming convention, not publisher-stated"
+        "Page references a 5,000-row maximum per response; confirm limit before bulk use",
+        "EIA_API_KEY is this harness's env-var name; the publisher only specifies the api_key request parameter",
+        "Licence wording not stated on this page"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "HTML page read (HTTP 200, 127,328 bytes) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27); key requirement, registration and api_key parameter taken from the page text"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/json"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "ercot-data-portal",
@@ -228,7 +245,8 @@
       },
       "live_fetch": "blocked_until_authorized",
       "allowed_content_types": [],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "nrel-cambium",
@@ -245,7 +263,7 @@
         "csv (UNVERIFIED)"
       ],
       "acquisition_method": "manual_download",
-      "release_identity": "Cambium 2024 per snippets; project id mapping UNVERIFIED",
+      "release_identity": "Cambium 2024 release (fifth annual edition) per www.nlr.gov/analysis/cambium; the release includes three products, one being the Scenario Viewer with the full 2024 datasets for viewing and download. Whether the registered viewer project id maps to the 2024 release is UNVERIFIED.",
       "license_attribution": "UNVERIFIED",
       "semantics": "MODELED scenario data (marginal emissions/costs); never observed facts",
       "units": "kg/MWh and $/MWh expected (UNVERIFIED)",
@@ -253,17 +271,22 @@
       "geography": "Model regions",
       "credential_env": [],
       "limitations": [
+        "The registered viewer URL is an interactive app shell (no fields in static HTML); release identity comes from the official sibling page www.nlr.gov/analysis/cambium",
+        "Licence, units, time resolution and geography wording not found on the pages read",
         "Modeled, not observed",
-        "Viewer may need interactive session"
+        "Publications listed on the page: docs/fy24osti/88507.pdf, fy25osti/92256.pdf, fy25osti/93005.pdf (not read)"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "Official sibling page www.nlr.gov/analysis/cambium read (HTTP 200, 29,850 bytes) via GitHub Actions probe run 40579353392 (2026-10-27): release edition and product list taken from it. The registered viewer URL was fetched (HTTP 200, 27,488 bytes) but is a JavaScript shell with no field evidence."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": [
+        "https://www.nlr.gov/analysis/cambium"
+      ]
     },
     {
       "id": "openei-urdb",
@@ -282,8 +305,8 @@
       ],
       "acquisition_method": "http_api",
       "release_identity": "API versions latest, 3-7 per snippets",
-      "license_attribution": "UNVERIFIED",
-      "semantics": "Published tariff structures; crowd-sourced, not a site's contracted rate",
+      "license_attribution": "Docs page footer: content available under Creative Commons Zero unless otherwise noted (applies to that wiki page; the licence of URDB data itself is NOT verified)",
+      "semantics": "Web service https://api.openei.org/utility_rates; api_key parameter is required (free signup); published tariff structures, not a site's contracted rate",
       "units": "$/kWh, $/kW (UNVERIFIED)",
       "time_convention": "TOU schedules as 12x24 matrices (UNVERIFIED)",
       "geography": "US utilities",
@@ -292,18 +315,20 @@
       ],
       "limitations": [
         "Generic tariff does not prove contracted rate or eligibility",
-        "OPENEI_API_KEY is this harness's naming convention"
+        "Docs page states it was last modified 22 May 2017: parameters/versions need rechecking against the live API",
+        "URDB data licence not verified"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "HTML page read (HTTP 200, 47,744 bytes) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27); endpoint, api_key requirement and footer licence text taken from the page"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/json"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     },
     {
       "id": "nws-api",
@@ -322,7 +347,7 @@
       "acquisition_method": "http_api",
       "release_identity": "Rolling",
       "license_attribution": "UNVERIFIED",
-      "semantics": "Observations and forecasts; weather context, not site cooling load",
+      "semantics": "Observations, forecasts and alerts; GeoJSON is the typical default format; OpenAPI spec at https://api.weather.gov/openapi.json",
       "units": "SI/US per product (UNVERIFIED)",
       "time_convention": "ISO 8601",
       "geography": "US grid points",
@@ -330,20 +355,22 @@
         "NWS_USER_AGENT"
       ],
       "limitations": [
-        "User-Agent header required per snippets",
-        "Weather is not a measured cooling load"
+        "A User-Agent identifying the application and a contact is required; the page says it will be replaced by an API key in future",
+        "Weather context is not a measured site cooling load",
+        "Rate limits and pricing wording not extracted"
       ],
       "verification": {
-        "status": "search_snippet_only",
+        "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "WebSearch snippets only; publisher host unreachable from the build sandbox (DNS/403). No page was read."
+        "basis": "HTML page read (HTTP 200, 50,377 bytes) via GitHub Actions run 40578807015 (probe workflow, 2026-10-27); User-Agent requirement and API-key note taken from the page text"
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [
         "application/geo+json",
         "application/json"
       ],
-      "max_bytes": 26214400
+      "max_bytes": 26214400,
+      "probe_urls": []
     }
   ]
 }

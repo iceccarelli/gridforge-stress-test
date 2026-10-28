@@ -6,11 +6,12 @@ import hashlib
 import json
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .findings import Finding, errors
 from .registry import RegistryError, validate_against
 
 MANIFEST_VERSION = "dataset-manifest/1"
@@ -98,3 +99,11 @@ def commit_snapshot(root: Path, name: str, data: bytes, manifest: Manifest) -> P
             Path(tmp).unlink(missing_ok=True)
             raise
     return target
+
+
+def promote(manifest: Manifest, findings: list[Finding]) -> Manifest:
+    """Only content validation can turn a transport-level success into `fetched_validated`."""
+    if manifest.retrieval_status != "fetched_unparsed":
+        raise RegistryError(f"cannot promote status {manifest.retrieval_status}")
+    status = "fetched_failed_validation" if errors(findings) else "fetched_validated"
+    return replace(manifest, retrieval_status=status)

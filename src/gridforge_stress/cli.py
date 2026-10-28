@@ -28,6 +28,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "fetch", help="LIVE: fetch one registered source (opt-in; network + credentials)"
     )
     f.add_argument("source_id")
+    pr = sub.add_parser("probe", help="LIVE, read-only: show what a source's publisher page says")
+    pr.add_argument("source_id", nargs="?")
+    pr.add_argument("--all", action="store_true")
     ns = p.parse_args(argv)
 
     if ns.cmd == "doctor":
@@ -65,10 +68,49 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         print(
             json.dumps(man.to_dict(), indent=2),
-            f"\n{len(body)} bytes (parser validation still required)",
+            f"\n{len(body)} bytes (NOT stored: transport checks only; no content validator has run)",
         )
         return 0
+    if ns.cmd == "probe":
+        return _probe(ns.source_id, ns.all)
     return 2
+
+
+def _probe(source_id: str | None, everything: bool) -> int:
+    from .fetch import FetchBlocked, FetchError, probe_source
+    from .probe import summarize
+
+    registry = load_sources()
+    ids = list(registry) if everything else [source_id or ""]
+    failures = 0
+    for sid in ids:
+        src = registry.get(sid)
+        targets: list[str | None] = [None]
+        if src is not None:
+            targets += list(src.probe_urls)
+        for target in targets:
+            try:
+                body, man, headers = probe_source(sid, url=target)
+                print(json.dumps(summarize(man, headers, body), indent=1, ensure_ascii=False))
+            except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
+                print(
+                    json.dumps(
+                        {
+                            "source_id": sid,
+                            "url": target,
+                            "probe": "BLOCKED_BY_POLICY",
+                            "reason": str(exc),
+                        }
+                    )
+                )
+            except FetchError as exc:
+                failures += 1
+                print(
+                    json.dumps(
+                        {"source_id": sid, "url": target, "probe": "NOT_READ", "reason": str(exc)}
+                    )
+                )
+    return 0 if failures == 0 else 3
 
 
 if __name__ == "__main__":

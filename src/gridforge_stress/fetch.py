@@ -81,6 +81,13 @@ class Transport(Protocol):
     ) -> Response: ...
 
 
+def check_declared_length(headers: Mapping[str, str], cap: int) -> None:
+    """Refuse before reading the body when the server already says it is larger than the cap."""
+    declared = headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > cap:
+        raise FetchFailed(f"download exceeds cap of {cap} bytes (server declares {declared} bytes)")
+
+
 class _PinnedHTTPS(http.client.HTTPSConnection):
     """Connects to a pre-validated IP while keeping SNI and certificate checks on the hostname."""
 
@@ -102,6 +109,7 @@ def default_transport(
     try:
         conn.request("GET", target, headers={"Host": host, **headers})
         resp = conn.getresponse()
+        check_declared_length({k.lower(): v for k, v in resp.getheaders()}, max_bytes)
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -150,8 +158,8 @@ def fetch_source(
 ) -> tuple[bytes, Manifest]:
     """Fetch one registered source. Returns (body, manifest). Never raises secrets.
 
-    The manifest says `fetched_validated` only when status 200, content type and size checks all passed.
-    Content-level (parser) validation is a separate, later step and must not be skipped by callers.
+    The manifest says `fetched_unparsed`: transport checks passed (status 200, content type, size) but no
+    parser has looked at the content. Use `manifest.promote` after content validation to reach `fetched_validated`.
     """
     registry = sources if sources is not None else default_sources()
     source = registry.get(source_id)
@@ -172,7 +180,10 @@ def fetch_source(
         if attempt:
             sleep(min(2.0**attempt, 8.0))
         try:
-            return _follow(source, current, resolver, transport, deadline, secrets)
+            body, manifest, _headers = _follow(
+                source, current, resolver, transport, deadline, secrets
+            )
+            return body, manifest
         except FetchBlocked:
             raise
         except (FetchFailed, OSError, http.client.HTTPException, ssl.SSLError) as exc:
@@ -193,7 +204,11 @@ def _follow(
     transport: Transport,
     deadline: float,
     secrets: Mapping[str, str],
-) -> tuple[bytes, Manifest]:
+    *,
+    max_bytes: int | None = None,
+    enforce_content_type: bool = True,
+) -> tuple[bytes, Manifest, Mapping[str, str]]:
+    cap = max_bytes if max_bytes is not None else source.max_bytes
     for _ in range(MAX_REDIRECTS + 1):
         parts = _check_url(source, url)
         host = (parts.hostname or "").lower()
@@ -201,9 +216,7 @@ def _follow(
         if not ips or not all(_is_public(ip) for ip in ips):
             raise FetchBlocked(f"{host} resolves to a non-public address; refusing")
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
-        resp = transport(
-            ips[0], host, target, {"User-Agent": USER_AGENT}, source.max_bytes, deadline
-        )
+        resp = _first_reachable(ips, host, target, transport, cap, deadline)
         if resp.status in (301, 302, 303, 307, 308):
             location = resp.headers.get("location")
             if not location:
@@ -215,15 +228,19 @@ def _follow(
         if resp.status != 200:
             raise FetchFailed(f"HTTP {resp.status}")
         ctype = resp.headers.get("content-type", "").split(";")[0].strip().lower()
-        if source.allowed_content_types and ctype not in source.allowed_content_types:
+        if (
+            enforce_content_type
+            and source.allowed_content_types
+            and ctype not in source.allowed_content_types
+        ):
             raise FetchFailed(f"unexpected content type {ctype!r}")
-        if len(resp.body) > source.max_bytes:
+        if len(resp.body) > cap:
             raise FetchFailed("download exceeds cap")
         manifest = Manifest(
             source_id=source.id,
             source_url=url,
             origin="live_fetch",
-            retrieval_status="fetched_validated",
+            retrieval_status="fetched_unparsed",
             attribution=str(source.raw["license_attribution"]),
             sha256=sha256_hex(resp.body),
             byte_count=len(resp.body),
@@ -231,11 +248,69 @@ def _follow(
             response_status=resp.status,
             limitations=list(source.raw["limitations"]),
         )
-        return resp.body, manifest
+        return resp.body, manifest, resp.headers
     raise FetchFailed("too many redirects")
+
+
+def _first_reachable(
+    ips: list[str], host: str, target: str, transport: Transport, cap: int, deadline: float
+) -> Response:
+    """Try each already-validated public address, IPv4 first (runners often lack an IPv6 route)."""
+    ordered = sorted(ips, key=lambda ip: ":" in ip)
+    last: OSError | None = None
+    for ip in ordered:
+        try:
+            return transport(ip, host, target, {"User-Agent": USER_AGENT}, cap, deadline)
+        except OSError as exc:  # connect/route failure: try the next validated address
+            last = exc
+    raise last if last is not None else FetchFailed("no address to connect to")
 
 
 def _join(base: str, location: str) -> str:
     from urllib.parse import urljoin
 
     return urljoin(base, location)
+
+
+PROBE_MAX_BYTES = 3_000_000
+
+
+def probe_source(
+    source_id: str,
+    *,
+    url: str | None = None,
+    resolver: Resolver = system_resolver,
+    transport: Transport = default_transport,
+    sources: Mapping[str, Source] | None = None,
+) -> tuple[bytes, Manifest, Mapping[str, str]]:
+    """Read-only look at a registered source's own locator, to verify what the publisher says.
+
+    Same host/IP/redirect/size guards as `fetch_source`, but: works while live fetch is still
+    `disabled_until_verified`, sends no credentials, does not enforce the (unverified) content-type list,
+    caps the body at PROBE_MAX_BYTES, makes one attempt, and returns headers. Gated sources stay blocked.
+    The result is evidence for a human or a verifier to read; it is never stored as a snapshot.
+    """
+    registry = sources if sources is not None else default_sources()
+    source = registry.get(source_id)
+    if source is None:
+        raise FetchBlocked(f"unknown source id {source_id!r}; arbitrary URLs are not accepted")
+    if source.live_fetch == "blocked_until_authorized":
+        raise FetchBlocked(f"{source_id} is blocked until authorized access exists")
+    if url is not None and url != source.locator and url not in source.probe_urls:
+        raise FetchBlocked("probe may only read the locator or a registered probe_urls entry")
+    deadline = time.monotonic() + TOTAL_TIMEOUT_S
+    try:
+        return _follow(
+            source,
+            url or source.locator,
+            resolver,
+            transport,
+            deadline,
+            {},
+            max_bytes=min(source.max_bytes, PROBE_MAX_BYTES),
+            enforce_content_type=False,
+        )
+    except FetchBlocked:
+        raise
+    except (FetchFailed, OSError, http.client.HTTPException, ssl.SSLError) as exc:
+        raise FetchFailed(f"{source_id}: {exc}") from exc
