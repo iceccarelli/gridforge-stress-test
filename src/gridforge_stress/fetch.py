@@ -279,6 +279,7 @@ def probe_source(
     source_id: str,
     *,
     url: str | None = None,
+    allow_large: bool = False,
     resolver: Resolver = system_resolver,
     transport: Transport = default_transport,
     sources: Mapping[str, Source] | None = None,
@@ -287,7 +288,7 @@ def probe_source(
 
     Same host/IP/redirect/size guards as `fetch_source`, but: works while live fetch is still
     `disabled_until_verified`, sends no credentials, does not enforce the (unverified) content-type list,
-    caps the body at PROBE_MAX_BYTES, makes one attempt, and returns headers. Gated sources stay blocked.
+    caps the body at PROBE_MAX_BYTES (or the source's own registry cap with allow_large, for one explicit file), makes one attempt, and returns headers. Gated sources stay blocked.
     The result is evidence for a human or a verifier to read; it is never stored as a snapshot.
     """
     registry = sources if sources is not None else default_sources()
@@ -307,7 +308,7 @@ def probe_source(
             transport,
             deadline,
             {},
-            max_bytes=min(source.max_bytes, PROBE_MAX_BYTES),
+            max_bytes=source.max_bytes if allow_large else min(source.max_bytes, PROBE_MAX_BYTES),
             enforce_content_type=False,
         )
     except FetchBlocked:

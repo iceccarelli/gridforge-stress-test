@@ -31,6 +31,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     pr = sub.add_parser("probe", help="LIVE, read-only: show what a source's publisher page says")
     pr.add_argument("source_id", nargs="?")
     pr.add_argument("--all", action="store_true")
+    pr.add_argument(
+        "--peek-xlsx",
+        action="store_true",
+        help="for registered .xlsx probe URLs: read within the source cap, in memory, print sheet layout",
+    )
     ns = p.parse_args(argv)
 
     if ns.cmd == "doctor":
@@ -72,13 +77,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if ns.cmd == "probe":
-        return _probe(ns.source_id, ns.all)
+        return _probe(ns.source_id, ns.all, ns.peek_xlsx)
     return 2
 
 
-def _probe(source_id: str | None, everything: bool) -> int:
+def _probe(source_id: str | None, everything: bool, peek_xlsx: bool = False) -> int:
     from .fetch import FetchBlocked, FetchError, probe_source
     from .probe import summarize
+    from .xlsx_peek import UnsafeWorkbook
 
     registry = load_sources()
     ids = list(registry) if everything else [source_id or ""]
@@ -90,8 +96,17 @@ def _probe(source_id: str | None, everything: bool) -> int:
             targets += list(src.probe_urls)
         for target in targets:
             try:
-                body, man, headers = probe_source(sid, url=target)
-                print(json.dumps(summarize(man, headers, body), indent=1, ensure_ascii=False))
+                is_xlsx = peek_xlsx and bool(target) and str(target).lower().endswith(".xlsx")
+                if peek_xlsx and not is_xlsx:
+                    continue
+                body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
+                if is_xlsx:
+                    from .xlsx_peek import peek
+
+                    report = {**summarize(man, headers, body), "workbook": peek(body)}
+                else:
+                    report = summarize(man, headers, body)
+                print(json.dumps(report, indent=1, ensure_ascii=False))
             except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
                 print(
                     json.dumps(
@@ -103,7 +118,7 @@ def _probe(source_id: str | None, everything: bool) -> int:
                         }
                     )
                 )
-            except FetchError as exc:
+            except (FetchError, UnsafeWorkbook) as exc:
                 failures += 1
                 print(
                     json.dumps(
