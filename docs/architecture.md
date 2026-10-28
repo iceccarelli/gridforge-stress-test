@@ -24,3 +24,10 @@ fixtures + parsers ──► Findings ──► evidence.assess ──► produc
   stable across 27 lead-time combinations; a "fastest" leader is never named on tied dates.
 - Evidence-gap detail for lead times: a date reads as supported only if EVERY taken step's lead time is above E0, so
   fixing the binding transformer alone cannot lift the grade (reported by the integration-seam investigation; not re-run here).
+
+## Agent interface
+`mcp_server` is a stdlib JSON-RPC 2.0 / MCP stdio server over the same functions the CLI uses; it adds no capability the
+harness rules forbid (no arbitrary-URL fetch; live reads need operator opt-in; product calls only to the allow-listed
+real handlers; schema-validated inputs; output cap; internals never returned). Where a standard CLI/API/MCP does not
+exist for something we need (e.g. our own evidence rubric, source registry or product claim gate), this is the pattern:
+build a small typed interface on the harness's own tested functions rather than a one-off script.

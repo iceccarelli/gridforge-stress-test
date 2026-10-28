@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gridforge-stress": {
+      "command": "uv",
+      "args": ["run", "--locked", "gridforge-stress", "mcp"]
+    }
+  }
+}

@@ -23,6 +23,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         dest="sub", required=True
     )
     sc.add_parser("list")
+    sub.add_parser("mcp", help="serve the harness as an MCP server over stdio")
     sub.add_parser("validate-fixtures", help="check fixture manifests, checksums, labels, content")
     f = sub.add_parser(
         "fetch", help="LIVE: fetch one registered source (opt-in; network + credentials)"
@@ -92,6 +93,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\n{len(body)} bytes (NOT stored: transport checks only; no content validator has run)",
         )
         return 0
+    if ns.cmd == "mcp":
+        from .mcp_server import main as mcp_main
+
+        return mcp_main()
     if ns.cmd == "probe":
         return _probe(ns.source_id, ns.all, ns.peek_xlsx, ns.profile, ns.queue_stats, ns.show_sheet)
     return 2

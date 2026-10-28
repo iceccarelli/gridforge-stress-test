@@ -22,6 +22,14 @@ Real-product slice (needs a GridForge-AI checkout; default `../GridForge-AI`):
 GRIDFORGE_PRODUCT_DIR=/path/to/GridForge-AI uv run --locked pytest -m product
 ```
 
+## Drive it from an agent (MCP)
+`uv run --locked gridforge-stress mcp` serves the harness as an MCP server over stdio (no extra dependency); `.mcp.json`
+registers it for Claude Code. Tools: `list_sources`, `get_source`, `list_scenarios`, `doctor`, `validate_fixtures`,
+`assess_evidence`, `parse_queue_rows`, `product_call` (the REAL GridForge-AI `compare`/`screen`/`diff` handlers, with a
+claim gate against an evidence level) and `probe_source` (off unless the operator sets `GRIDFORGE_STRESS_ALLOW_LIVE=1`).
+There is deliberately no tool that fetches an arbitrary URL. Inputs are schema-validated; failures are tool errors, never
+tracebacks.
+
 ## First working example
 `tests/integration/test_product_ttp.py` feeds a synthetic reference hall through the product's real
 `/v1/compare` handler and checks the date (160 weeks, set by the transformer lead time) against an independent
