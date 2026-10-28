@@ -19,7 +19,7 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - run: uv python install ${{ matrix.python-version }}
       - run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
       - run: uv run --locked ruff check .
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --locked --all-groups
       - run: uv build
       - name: Wheel must carry registry and schemas
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --locked --all-groups
       - name: Audit exactly what uv.lock pins (not the live environment, which contains this project editable)
         run: |
