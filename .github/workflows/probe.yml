@@ -24,7 +24,7 @@ jobs:
           set -o pipefail
           uv run --locked gridforge-stress probe --all | tee probe-report.json
       - name: Peek at registered workbooks (explicit; in memory, bounded by the source cap, nothing stored)
-        if: github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -o pipefail
