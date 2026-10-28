@@ -268,14 +268,19 @@ def test_parser_rules_are_consistent_with_what_the_real_data_contains():
         assert not [f for f in findings if f.severity == "error"], name
 
 
-def test_rows_that_cannot_be_placed_are_the_only_ones_rejected():
+def test_only_rows_that_cannot_be_placed_in_a_cohort_are_rejected():
     base = {"q_id": "Q1", "entity": "APS", "q_status": "active", "q_date": "43511", "mw_1": "10"}
     assert (
         parse_rows([{**base, "q_date": ""}], LBNL_2026_MAP)[0] == []
     )  # 665 such rows exist in the data
-    assert (
-        parse_rows([{**base, "mw_1": "-75"}], LBNL_2026_MAP)[0] == []
+    kept, found = parse_rows(
+        [{**base, "mw_1": "-75"}], LBNL_2026_MAP
     )  # a negative mw_1 exists (min -75)
+    assert (
+        len(kept) == 1
+        and kept[0].flags == ("nonpositive_capacity",)
+        and found[0].severity == "warning"
+    )
     assert len(parse_rows([{**base, "q_status": "unknown"}], LBNL_2026_MAP)[0]) == 1
 
 
@@ -320,11 +325,13 @@ def test_repeated_keys_are_distinct_rows_not_copies_so_the_parser_keeps_every_ro
     assert len(recs) == 2 and all("duplicate_key" in r.flags for r in recs)
 
 
-def test_non_positive_capacity_rows_are_the_only_capacity_rejections_and_are_counted():
+def test_non_positive_capacity_rows_are_kept_flagged_and_counted():
     assert MEASURED["mw_1_zero"] + MEASURED["mw_1_negative"] == 18
     base = {"q_id": "Q1", "entity": "APS", "q_status": "active", "q_date": "43511"}
-    for v, rejected in (("0", True), ("-1", True), ("0.5", False)):
-        assert (parse_rows([{**base, "mw_1": v}], LBNL_2026_MAP)[0] == []) is rejected
+    for v in ("0", "-1", "0.5"):
+        recs, _ = parse_rows([{**base, "mw_1": v}], LBNL_2026_MAP)
+        assert len(recs) == 1, "valid dates: kept for duration statistics"
+        assert ("nonpositive_capacity" in recs[0].flags) is (v != "0.5")
 
 
 def test_measured_capacity_repeat_is_consistent_and_motivates_counting_requests_once():
@@ -352,3 +359,125 @@ def test_capacity_summary_reproduces_the_measured_double_count_shape_on_the_obse
     assert (
         out["naive_row_sum"] == out["deduplicated_sum"] == 20 + 24 + 900 + 300 + 700 + 60
     )  # no repeats in these rows
+
+
+# --- run 40639536058: real-data durations/capacity and LBNL's own published table -----------------------------------
+# Measured 2026-10-28 by `probe lbnl-queued-up --queue-stats --show-sheet "37. IR to COD - all"` (same workbook sha256).
+# OUR numbers were produced by the parser BEFORE non-positive-capacity rows were kept (those 18 rows were rejected then),
+# so the kept/rejected counts and duration n below describe that parser version, not the current one.
+OUR_RUN2 = {
+    "rows": 38_201,
+    "kept": 37_518,
+    "rejected": 683,
+    "operational_with_in_service_date": 3_145,
+    "excluded_impossible_date_order": 48,
+    "excluded_repeated_key_rows": 0,
+    "all_cod_years": {"n": 3_097, "p25_years": 1.96, "median_years": 3.581, "p75_years": 5.183},
+    "cod_2018_2025": {"n": 1_439, "p25_years": 3.086, "median_years": 4.394, "p75_years": 5.844},
+    "capacity": {
+        "naive_row_sum": 6_686_499.302,
+        "deduplicated_sum": 6_660_040.702,
+        "double_counting_avoided_mw": 26_458.6,
+        "rows_not_counted": 135,
+        "keys_with_differing_capacity": 1,
+        "dedup_by_status": {
+            "active": 1_739_387.301,
+            "operational": 502_925.395,
+            "suspended": 133_561.625,
+            "unknown": 967.0,
+            "withdrawn": 4_283_199.381,
+        },
+        "naive_by_status": {
+            "active": 1_739_387.301,
+            "operational": 529_383.995,
+            "suspended": 133_561.625,
+            "unknown": 967.0,
+            "withdrawn": 4_283_199.381,
+        },
+    },
+}
+# LBNL's own sheet '37. IR to COD - all': in-service year -> (n requests, median duration in months), as published.
+PUBLISHER_IR_TO_COD = {
+    2005: (63, 17.674113009198422),
+    2006: (76, 22.519710906701711),
+    2007: (96, 25.558475689881728),
+    2008: (114, 21.764126149802891),
+    2009: (97, 31.077529566360049),
+    2010: (107, 33.508541392904071),
+    2011: (122, 35.348226018396844),
+    2012: (141, 31.471747700394221),
+    2013: (102, 35.791721419185279),
+    2014: (108, 45.71287779237845),
+    2015: (164, 37.812089356110377),
+    2016: (180, 43.988173455978973),
+    2017: (138, 39.881734559789749),
+    2018: (152, 41.869250985545342),
+    2019: (153, 46.484888304862032),
+    2020: (227, 46.057818659658338),
+    2021: (200, 49.967148488830482),
+    2022: (176, 55.157687253613673),
+    2023: (265, 55.749014454664909),
+    2024: (335, 62.713534822601837),
+    2025: (294, 60.82457293035479),
+}
+PUBLISHER_NOTE_SAMPLE = 3_310  # 'Sample includes 3,310 projects from 6 ISOs and 19 non-ISO BAs ...'
+
+
+def test_our_run2_counts_reconcile():
+    o = OUR_RUN2
+    assert o["kept"] + o["rejected"] == o["rows"]
+    assert (
+        o["rejected"]
+        == MEASURED["q_date_blank"] + MEASURED["mw_1_zero"] + MEASURED["mw_1_negative"]
+    )  # 665 + 18
+    assert (
+        o["operational_with_in_service_date"] - o["excluded_impossible_date_order"]
+        == o["all_cod_years"]["n"]
+    )
+    for k in ("all_cod_years", "cod_2018_2025"):
+        d = o[k]
+        assert d["p25_years"] < d["median_years"] < d["p75_years"]
+    assert o["cod_2018_2025"]["n"] < o["all_cod_years"]["n"]
+
+
+def test_capacity_run2_reconciles_with_the_double_count_and_the_status_split():
+    c = OUR_RUN2["capacity"]
+    assert c["naive_row_sum"] - c["deduplicated_sum"] == pytest.approx(
+        c["double_counting_avoided_mw"], abs=1e-3
+    )
+    assert sum(c["dedup_by_status"].values()) == pytest.approx(c["deduplicated_sum"], abs=1e-3)
+    assert sum(c["naive_by_status"].values()) == pytest.approx(c["naive_row_sum"], abs=1e-3)
+    assert c["rows_not_counted"] == MEASURED["repeated_entity_id_keys"]
+    assert c["double_counting_avoided_mw"] == pytest.approx(
+        MEASURED["mw_1_sum_on_non_first_rows"]
+    ), "matches run 40638926321"
+    # every repeated-key extra row is operational: the whole double count sits in the operational status
+    diffs = {k: c["naive_by_status"][k] - c["dedup_by_status"][k] for k in c["naive_by_status"]}
+    assert diffs["operational"] == pytest.approx(c["double_counting_avoided_mw"], abs=1e-3)
+    assert all(v == pytest.approx(0.0) for k, v in diffs.items() if k != "operational")
+
+
+def test_publisher_table_transcription_reconciles_with_its_own_sample_note():
+    assert sum(n for n, _ in PUBLISHER_IR_TO_COD.values()) == PUBLISHER_NOTE_SAMPLE
+    assert sum(PUBLISHER_IR_TO_COD[y][0] for y in range(2018, 2026)) == 1_802
+    assert min(PUBLISHER_IR_TO_COD) == 2005 and max(PUBLISHER_IR_TO_COD) == 2025
+
+
+def test_cross_check_finding_our_operational_population_is_not_the_publishers_sample():
+    """The publisher's sample (3,310) exceeds our ENTIRE operational-with-in-service-date population (3,145 before any
+    exclusion), so its sample is not a subset of ours. 420 requests have an in-service date but are not 'operational'.
+    Hypothesis (UNVERIFIED): the publisher keys on the presence of both dates, not on status. Measured next with
+    population='has_in_service_date' per COD year."""
+    assert OUR_RUN2["operational_with_in_service_date"] < PUBLISHER_NOTE_SAMPLE
+    non_operational_with_on_date = (
+        MEASURED["active_rows_with_on_date"]
+        + MEASURED["withdrawn_rows_with_on_date"]
+        + MEASURED["suspended_rows_with_on_date"]
+    )
+    assert non_operational_with_on_date == 420
+    assert OUR_RUN2["cod_2018_2025"]["n"] < sum(
+        PUBLISHER_IR_TO_COD[y][0] for y in range(2018, 2026)
+    )
+    # the publisher's medians sit in a plausible band around ours (months -> years); this is context, NOT a validation
+    pub_years = [PUBLISHER_IR_TO_COD[y][1] / 12 for y in range(2018, 2026)]
+    assert min(pub_years) < OUR_RUN2["cod_2018_2025"]["median_years"] < max(pub_years)

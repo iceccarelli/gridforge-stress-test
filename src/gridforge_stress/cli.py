@@ -170,6 +170,24 @@ def _probe(
                         print(
                             json.dumps({"capacity_summary": capacity_summary(recs)}, sort_keys=True)
                         )
+                        for label, pop in (
+                            ("any_status", "has_in_service_date"),
+                            ("operational", "operational"),
+                        ):
+                            by_year = duration_summary(
+                                recs,
+                                cod_year_min=2005,
+                                cod_year_max=2025,
+                                group_by="cod_year",
+                                population=pop,
+                            )
+                            n_all = by_year["overall"].get("n")
+                            print(
+                                f"{label}_by_cod_year_2005_2025: overall_n={n_all} "
+                                f"excluded_order={by_year['excluded_impossible_date_order']}"
+                            )
+                            for yr, st in by_year["by_cod_year"].items():
+                                print(f"  {yr} n={st['n']} median_months={st['median_months']}")
                     if show_sheets:
                         for name in show_sheets:
                             print("\n".join(show_sheet_lines(body, name)))

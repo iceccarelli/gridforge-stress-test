@@ -39,6 +39,7 @@ FLAG_MISSING_ON = "missing_in_service_date"
 FLAG_DUP_KEY = "duplicate_key"
 FLAG_SPLIT_CAP = "split_capacity"
 FLAG_UNASSIGNED = "unassigned_id"
+FLAG_NONPOS_CAP = "nonpositive_capacity"
 
 
 @dataclass(frozen=True)
@@ -235,11 +236,21 @@ def parse_rows(
         except (TypeError, ValueError):
             findings.append(Finding("bad_capacity", "capacity not numeric", where=where))
             continue
-        if not math.isfinite(mw) or mw <= 0:
-            findings.append(
-                Finding("bad_capacity", f"capacity {mw} not finite and positive", where=where)
-            )
+        if not math.isfinite(mw):
+            findings.append(Finding("bad_capacity", f"capacity {mw} is not finite", where=where))
             continue
+        if mw <= 0:
+            # The real data has such rows (2 zero, 16 negative). Their dates are fine, so dropping the row would
+            # also remove it from duration statistics: flag it and exclude it from capacity sums only.
+            flags.append(FLAG_NONPOS_CAP)
+            findings.append(
+                Finding(
+                    "nonpositive_capacity",
+                    f"capacity {mw} is not positive; kept and flagged, excluded from capacity sums",
+                    "warning",
+                    where,
+                )
+            )
         if any(not _blank(row.get(c)) for c in cmap.extra_capacity):
             flags.append(FLAG_SPLIT_CAP)
             findings.append(
@@ -354,21 +365,30 @@ def duration_summary(
     cod_year_min: int | None = None,
     cod_year_max: int | None = None,
     group_by: str | None = None,
+    population: str = "operational",
 ) -> dict[str, Any]:
-    """Years from queue entry (IR) to in-service date (COD) among OPERATIONAL requests that have both dates.
+    """Years (and months) from queue entry (IR) to in-service date (COD) among requests that have both dates.
+
+    `population`: "operational" (status operational with an in-service date; the default) or
+    "has_in_service_date" (any status). The two differ in the real data: 420 non-operational requests carry an
+    in-service date. `group_by` may be a raw column name or "cod_year".
 
     Excluded, with counts disclosed: rows with impossible date order; rows sharing a (entity, id) key beyond the
     first (one request listed per location must not be counted once per row). The result is conditioned on
     reaching COD (survivorship): it is NOT the time a request takes in general, and says nothing about load
     connections.
     """
+    if population not in ("operational", "has_in_service_date"):
+        raise ValueError("population must be 'operational' or 'has_in_service_date'")
     recs = list(records)
-    op = [r for r in recs if r.status == "operational" and r.in_service_date is not None]
-    conflicted = [r for r in op if FLAG_DATE_ORDER in r.flags]
+    with_date = [r for r in recs if r.in_service_date is not None]
+    op = [r for r in with_date if r.status == "operational"]
+    pop = op if population == "operational" else with_date
+    conflicted = [r for r in pop if FLAG_DATE_ORDER in r.flags]
     seen: set[tuple[str, str]] = set()
     kept: list[QueueRecord] = []
     dup_dropped = 0
-    for r in op:
+    for r in pop:
         if FLAG_DATE_ORDER in r.flags:
             continue
         if FLAG_DUP_KEY in r.flags:
@@ -389,21 +409,32 @@ def duration_summary(
         )
         if not yrs:
             return {"n": 0}
+        p25, med, p75 = percentile(yrs, 0.25), percentile(yrs, 0.5), percentile(yrs, 0.75)
         return {
             "n": len(yrs),
-            "p25_years": round(percentile(yrs, 0.25), 3),
-            "median_years": round(percentile(yrs, 0.5), 3),
-            "p75_years": round(percentile(yrs, 0.75), 3),
+            "p25_years": round(p25, 3),
+            "median_years": round(med, 3),
+            "p75_years": round(p75, 3),
             "min_years": round(yrs[0], 3),
             "max_years": round(yrs[-1], 3),
+            "median_months": round(med * 12, 3),
+            "p25_months": round(p25 * 12, 3),
+            "p75_months": round(p75 * 12, 3),
         }
 
+    what = (
+        "operational requests with both dates"
+        if population == "operational"
+        else "requests of any status with both dates"
+    )
     out: dict[str, Any] = {
         "label": QUEUE_STAT_LABEL,
-        "definition": "years from queue entry to in-service date, operational requests with both dates; "
-        "conditioned on reaching COD (survivorship); not a time-to-power for a load",
+        "definition": f"years from queue entry to in-service date, {what}; conditioned on reaching COD "
+        "(survivorship); not a time-to-power for a load",
+        "population": population,
         "cod_year_range": [cod_year_min, cod_year_max],
         "operational_with_in_service_date": len(op),
+        "population_with_in_service_date": len(pop),
         "excluded_impossible_date_order": len(conflicted),
         "excluded_repeated_key_rows": dup_dropped,
         "overall": stats(kept),
@@ -411,7 +442,11 @@ def duration_summary(
     if group_by:
         groups: dict[str, list[QueueRecord]] = {}
         for r in kept:
-            groups.setdefault(str(r.raw.get(group_by, "")) or "(blank)", []).append(r)
+            if group_by == "cod_year":
+                group = str(r.in_service_date.year) if r.in_service_date else "(none)"
+            else:
+                group = str(r.raw.get(group_by, "")) or "(blank)"
+            groups.setdefault(group, []).append(r)
         out["by_" + group_by] = {k: stats(v) for k, v in sorted(groups.items())}
     return out
 
@@ -431,7 +466,11 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
     avoided_rows = 0
     by_status_dedup: dict[str, float] = {}
     by_status_naive: dict[str, float] = {}
+    nonpositive = 0
     for r in records:
+        if FLAG_NONPOS_CAP in r.flags:
+            nonpositive += 1
+            continue
         naive += r.capacity_mw
         by_status_naive[r.status] = by_status_naive.get(r.status, 0.0) + r.capacity_mw
         if FLAG_DUP_KEY in r.flags:
@@ -452,6 +491,7 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
         "deduplicated_sum": round(dedup, 3),
         "double_counting_avoided_mw": round(avoided, 3),
         "rows_not_counted": avoided_rows,
+        "rows_excluded_nonpositive_capacity": nonpositive,
         "keys_with_differing_capacity": len(differing),
         "by_status_deduplicated": {k: round(v, 3) for k, v in sorted(by_status_dedup.items())},
         "by_status_naive": {k: round(v, 3) for k, v in sorted(by_status_naive.items())},

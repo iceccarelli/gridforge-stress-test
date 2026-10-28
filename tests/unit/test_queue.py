@@ -45,8 +45,6 @@ def fixture_records():
         (base(entered="31/12/2020"), "bad_date"),
         (base(entered=""), "missing_queue_date"),
         (base(mw="abc"), "bad_capacity"),
-        (base(mw="-5"), "bad_capacity"),
-        (base(mw="0"), "bad_capacity"),
         (base(mw="nan"), "bad_capacity"),
         (base(mw="inf"), "bad_capacity"),
     ],
@@ -367,3 +365,76 @@ def test_capacity_summary_without_repeats_equals_the_naive_sum():
         and out["double_counting_avoided_mw"] == 0.0
     )
     assert capacity_summary([])["naive_row_sum"] == 0.0
+
+
+def test_non_positive_capacity_is_kept_and_flagged_and_excluded_only_from_capacity_sums():
+    """The real data has 2 zero and 16 negative mw_1 values. Their dates are fine, so they stay in duration statistics."""
+    from gridforge_stress.queue import capacity_summary, duration_summary
+
+    rows = [
+        base(
+            proj="neg", stat="Operational", mw="-75", entered="2015-01-01", in_service="2019-01-01"
+        ),
+        base(
+            proj="zero", stat="Operational", mw="0", entered="2015-01-01", in_service="2019-01-01"
+        ),
+        base(proj="ok", stat="Operational", mw="40", entered="2015-01-01", in_service="2019-01-01"),
+    ]
+    recs, f = parse_rows(rows, QUEUE_MAP)
+    assert len(recs) == 3 and [r.flags for r in recs[:2]] == [("nonpositive_capacity",)] * 2
+    assert [x.code for x in f] == ["nonpositive_capacity", "nonpositive_capacity"]
+    assert all(x.severity == "warning" for x in f)
+    cap = capacity_summary(recs)
+    assert (
+        cap["naive_row_sum"] == cap["deduplicated_sum"] == 40.0
+        and cap["rows_excluded_nonpositive_capacity"] == 2
+    )
+    assert duration_summary(recs)["overall"]["n"] == 3, (
+        "dates are valid: all three belong in duration statistics"
+    )
+
+
+def test_non_finite_capacity_is_still_rejected():
+    for v in ("nan", "inf", "-inf", "abc", ""):
+        recs, f = parse_rows([base(mw=v)], QUEUE_MAP)
+        assert recs == [] and f[0].code == "bad_capacity" and f[0].severity == "error", v
+
+
+def test_population_option_separates_operational_from_any_status_with_an_in_service_date():
+    from gridforge_stress.queue import duration_summary
+
+    rows = [
+        base(proj="op", stat="Operational", entered="2015-01-01", in_service="2019-01-01"),
+        base(
+            proj="act", stat="Active", entered="2015-01-01", in_service="2021-01-01"
+        ),  # status/date conflict row
+        base(proj="wd", stat="Withdrawn", entered="2015-01-01", in_service="2017-01-01"),
+    ]
+    recs, _ = parse_rows(rows, QUEUE_MAP)
+    op = duration_summary(recs)
+    anyst = duration_summary(recs, population="has_in_service_date")
+    assert op["population"] == "operational" and op["overall"]["n"] == 1
+    assert anyst["population"] == "has_in_service_date" and anyst["overall"]["n"] == 3
+    assert op["operational_with_in_service_date"] == anyst["operational_with_in_service_date"] == 1
+    assert anyst["population_with_in_service_date"] == 3 and "any status" in anyst["definition"]
+    with pytest.raises(ValueError):
+        duration_summary(recs, population="bogus")
+
+
+def test_cod_year_grouping_and_months_match_hand_computation():
+    from gridforge_stress.queue import duration_summary
+
+    rows = [
+        base(proj="a", stat="Operational", entered="2015-01-01", in_service="2019-01-01"),
+        base(proj="b", stat="Operational", entered="2017-01-01", in_service="2019-06-01"),
+        base(proj="c", stat="Operational", entered="2010-01-01", in_service="2020-01-01"),
+    ]
+    recs, _ = parse_rows(rows, QUEUE_MAP)
+    out = duration_summary(recs, group_by="cod_year")
+    assert set(out["by_cod_year"]) == {"2019", "2020"} and out["by_cod_year"]["2019"]["n"] == 2
+    ya, yb = years("2015-01-01", "2019-01-01"), years("2017-01-01", "2019-06-01")
+    assert out["by_cod_year"]["2019"]["median_years"] == pytest.approx((ya + yb) / 2, abs=1e-3)
+    assert out["by_cod_year"]["2019"]["median_months"] == pytest.approx(
+        (ya + yb) / 2 * 12, abs=2e-3
+    )
+    assert out["by_cod_year"]["2020"]["n"] == 1
