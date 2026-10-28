@@ -283,16 +283,39 @@ def test_a_duplicated_transformer_must_not_change_the_answer_silently(intake, ba
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="a 1,000,000,000-week lead time is accepted and dated, with no plausibility caveat",
-)
-def test_an_implausible_lead_time_must_be_refused_or_caveated(intake, baseline):
+# --- gaps the product has fixed (PR #87): now ordinary regression tests -----------------------------------------
+
+
+def _refused_naming(out, field):
+    return out["ok"] is False and out["error"] == "IntakeError" and field in out["message"]
+
+
+def test_an_implausible_lead_time_is_refused_by_field_name(intake):
     out = compare(
         mutated(intake, lambda x: x["btm_options"][0].__setitem__("lead_time_weeks", 1e9))
     )
-    assert not out["ok"] or out["result"]["caveats"] != baseline["caveats"]
+    assert _refused_naming(out, "lead_time_weeks"), out
+
+
+@pytest.mark.parametrize(
+    ("field", "change"),
+    [
+        ("positions_available", lambda x: x["hall"].__setitem__("positions_available", 9999)),
+        ("firm_capacity_MVA", lambda x: x["grid"].__setitem__("firm_capacity_MVA", 14000)),
+        ("contracted_MW", lambda x: x["grid"].__setitem__("contracted_MW", 5001)),
+    ],
+    ids=["more_positions_available_than_exist", "firm_capacity_1000x_unit_error", "above_ceiling"],
+)
+def test_impossible_magnitudes_are_refused_by_field_name(intake, field, change):
+    assert _refused_naming(compare(mutated(intake, change)), field)
+
+
+def test_the_product_ceiling_is_a_boundary_not_a_blanket_refusal(intake):
+    at_ceiling = compare(mutated(intake, lambda x: x["grid"].__setitem__("contracted_MW", 5000)))
+    assert at_ceiling["ok"], at_ceiling
+
+
+# --- gaps still open in the product (strict xfail; AssertionError only) -------------------------------------------
 
 
 @pytest.mark.xfail(
@@ -308,12 +331,8 @@ def test_an_unknown_evidence_class_must_be_refused(intake):
 
 
 IMPOSSIBLE = {
-    "more_positions_available_than_exist": lambda x: x["hall"].__setitem__(
-        "positions_available", 9999
-    ),
     "build_year_in_the_future": lambda x: x["hall"].__setitem__("build_year", 2099),
     "it_load_far_above_contracted_power": lambda x: x["grid"].__setitem__("current_it_load_MW", 99),
-    "firm_capacity_1000x_unit_error": lambda x: x["grid"].__setitem__("firm_capacity_MVA", 14000),
 }
 
 

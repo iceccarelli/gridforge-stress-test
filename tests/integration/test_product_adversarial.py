@@ -131,7 +131,7 @@ def test_capacity_is_monotone_in_firm_and_contracted_power_and_capped_by_the_sma
         racks(mutated(intake, lambda x, v=v: x["grid"].__setitem__("contracted_MW", v)))[
             "full_dlc_btm"
         ]
-        for v in (6.0, 12.0, 50.0, 10_000.0)
+        for v in (6.0, 12.0, 50.0, 5_000.0)  # 5,000 MW is the product's ceiling
     ]
     assert con == sorted(con)
     assert con[-2] == con[-1], "contracted MW above firm capacity must not buy extra compute"
