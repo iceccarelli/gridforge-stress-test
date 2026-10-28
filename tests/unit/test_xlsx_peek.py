@@ -140,3 +140,184 @@ def test_compact_report_is_one_line_per_sheet_and_shows_doc_sheets_and_largest()
         "codebook-like names are always detailed"
     )
     assert not any("," in x and "[" in x and x.startswith("  [") for x in lines)
+
+
+# --- value profile ---------------------------------------------------------------------------------------------
+
+
+def make_data_workbook(rows: list[list[str]], header=None) -> bytes:
+    """SYNTHETIC workbook: row1 'RETURN TO CONTENTS', row2 header, then `rows` (strings; numeric-looking => numbers)."""
+    header = header or ["q_id", "q_status", "q_date", "wd_date", "on_date", "entity", "mw_1"]
+    strings: list[str] = []
+
+    def sid(t: str) -> int:
+        if t not in strings:
+            strings.append(t)
+        return strings.index(t)
+
+    def col(i: int) -> str:
+        return "ABCDEFGHIJ"[i]
+
+    def cell(r: int, i: int, v: str) -> str:
+        if v == "":
+            return ""
+        try:
+            float(v)
+            return f'<c r="{col(i)}{r}"><v>{v}</v></c>'
+        except ValueError:
+            return f'<c r="{col(i)}{r}" t="s"><v>{sid(v)}</v></c>'
+
+    xml_rows = [f'<row r="1"><c r="A1" t="s"><v>{sid("RETURN TO CONTENTS")}</v></c></row>']
+    for n, row in enumerate([header, *rows], start=2):
+        xml_rows.append(
+            f'<row r="{n}">' + "".join(cell(n, i, v) for i, v in enumerate(row)) + "</row>"
+        )
+    sheet = f'<worksheet xmlns="{M}"><sheetData>{"".join(xml_rows)}</sheetData></worksheet>'
+    sst = "".join(f"<si><t>{s}</t></si>" for s in strings)
+    parts = {
+        "xl/workbook.xml": f'<workbook xmlns="{M}" xmlns:r="{R}"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/_rels/workbook.xml.rels": '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+        "xl/sharedStrings.xml": f'<sst xmlns="{M}">{sst}</sst>',
+        "xl/worksheets/sheet1.xml": sheet,
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for k, v in parts.items():
+            zf.writestr(k, v)
+    return buf.getvalue()
+
+
+DATA = [
+    # q_id, q_status, q_date, wd_date, on_date, entity, mw_1
+    ["Q1", "withdrawn", "40000", "", "", "APS", "10"],
+    ["Q2", "withdrawn", "40100", "40200", "", "APS", "20"],
+    ["Q3", "operational", "40000", "", "41000", "APS", "30"],
+    ["Q4", "operational", "40000", "", "", "PGE", "40"],
+    ["Q5", "active", "42000", "", "", "PGE", "50"],
+    ["Q1", "active", "42000", "", "", "PGE", "60"],  # same id, other entity: NOT a duplicate
+    [
+        "Q3",
+        "operational",
+        "40000",
+        "",
+        "39000",
+        "APS",
+        "70",
+    ],  # duplicate (APS,Q3) AND on_date < q_date
+    [
+        "not assigned",
+        "withdrawn",
+        "40500",
+        "40400",
+        "",
+        "APS",
+        "80",
+    ],  # wd < q_date; excluded from dup check
+    ["not assigned", "withdrawn", "40500", "", "", "APS", "5"],
+]
+
+
+def prof(**kw):
+    return X.profile_sheet(
+        make_data_workbook(DATA),
+        "Data",
+        header_marker="q_id",
+        columns=("q_status", "wd_date", "mw_1", "entity"),
+        blank_checks=(("q_status", "withdrawn", "wd_date"), ("q_status", "operational", "on_date")),
+        order_checks=(("wd_date", "q_date"), ("on_date", "q_date")),
+        dup_key=("entity", "q_id"),
+        dup_exclude={"q_id": "not assigned"},
+        **kw,
+    )
+
+
+def test_profile_finds_header_after_the_banner_row_and_counts_rows():
+    p = prof()
+    assert p["header_row_index"] == 1 and p["data_rows"] == len(DATA)
+
+
+def test_profile_value_frequencies_blanks_and_numeric_ranges_match_independent_counts():
+    cols = prof()["columns"]
+    assert cols["q_status"]["top_values"] == {"withdrawn": 4, "operational": 3, "active": 2}
+    assert cols["q_status"]["distinct_total"] == 3 and cols["q_status"]["blank"] == 0
+    assert cols["wd_date"]["non_blank"] == 2 and cols["wd_date"]["blank"] == 7
+    assert (cols["mw_1"]["numeric_min"], cols["mw_1"]["numeric_max"]) == (5.0, 80.0)
+    assert "numeric_min" not in cols["q_status"]
+
+
+def test_profile_blank_order_and_duplicate_checks():
+    p = prof()
+    wd, op = p["blank_checks"]
+    assert (wd["rows"], wd["rows_with_blank"]) == (4, 2)  # Q1 and one 'not assigned' lack wd_date
+    assert (op["rows"], op["rows_with_blank"]) == (3, 1)  # only Q4 lacks on_date
+    o_wd, o_on = p["order_checks"]
+    assert (o_wd["rows_with_both"], o_wd["rows_violating"]) == (2, 1)
+    assert (o_on["rows_with_both"], o_on["rows_violating"]) == (2, 1)
+    d = p["duplicate_key"]
+    assert d["excluded_rows"] == 2 and d["keys_repeated"] == 1 and d["rows_in_repeated_keys"] == 2
+    # (APS,Q1) (APS,Q2) (APS,Q3) (PGE,Q4) (PGE,Q5) (PGE,Q1); (APS,Q3) repeats
+    assert d["distinct_keys"] == 6
+
+
+def test_profile_caps_listed_distinct_values_but_reports_the_true_total():
+    rows = [[f"Q{i}", f"s{i}", "40000", "", "", "E", "1"] for i in range(80)]
+    p = X.profile_sheet(
+        make_data_workbook(rows),
+        "Data",
+        header_marker="q_id",
+        columns=("q_status",),
+        max_distinct=10,
+    )
+    c = p["columns"]["q_status"]
+    assert c["distinct_total"] == 80 and len(c["top_values"]) == 10
+
+
+def test_profile_rejects_missing_sheet_marker_and_columns():
+    wb = make_data_workbook(DATA)
+    with pytest.raises(X.UnsafeWorkbook, match="no sheet"):
+        X.profile_sheet(wb, "Nope", header_marker="q_id", columns=("q_status",))
+    with pytest.raises(X.UnsafeWorkbook, match="header marker"):
+        X.profile_sheet(wb, "Data", header_marker="zzz", columns=("q_status",))
+    with pytest.raises(X.UnsafeWorkbook, match="columns not in header"):
+        X.profile_sheet(wb, "Data", header_marker="q_id", columns=("nope",))
+
+
+def test_profile_lines_are_compact_and_cli_profile_wires_through(monkeypatch, capsys):
+    from gridforge_stress import cli
+
+    wb = make_data_workbook(
+        DATA, header=["q_id", "q_status", "q_date", "wd_date", "on_date", "entity", "mw_1"]
+    )
+    lines = X.profile_lines(prof())
+    assert lines[0].startswith("profile of 'Data'") and all("\n" not in x for x in lines)
+
+    def fake_probe(sid, url=None, allow_large=False, **kw):
+        man = F.Manifest(
+            source_id=sid,
+            source_url=url or "",
+            origin="live_fetch",
+            retrieval_status="fetched_unparsed",
+            attribution="a",
+            byte_count=len(wb),
+        )
+        return wb, man, {"content-type": "x"}
+
+    monkeypatch.setattr(F, "probe_source", fake_probe)
+    import gridforge_stress.queue as Q
+
+    monkeypatch.setattr(
+        Q,
+        "LBNL_2026_PROFILE",
+        {
+            "sheet_name": "Data",
+            "header_marker": "q_id",
+            "columns": ("q_status",),
+            "blank_checks": (),
+            "order_checks": (),
+            "dup_key": (),
+            "dup_exclude": None,
+        },
+    )
+    assert cli.main(["probe", "lbnl-queued-up", "--profile"]) == 0
+    out = capsys.readouterr().out
+    assert "profile of 'Data'" in out and "'withdrawn':4" in out

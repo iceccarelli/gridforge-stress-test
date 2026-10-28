@@ -32,6 +32,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     pr.add_argument("source_id", nargs="?")
     pr.add_argument("--all", action="store_true")
     pr.add_argument(
+        "--profile",
+        action="store_true",
+        help="for the registered LBNL workbook URL: bounded value profile of the observed columns",
+    )
+    pr.add_argument(
         "--peek-xlsx",
         action="store_true",
         help="for registered .xlsx probe URLs: read within the source cap, in memory, print sheet layout",
@@ -77,11 +82,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if ns.cmd == "probe":
-        return _probe(ns.source_id, ns.all, ns.peek_xlsx)
+        return _probe(ns.source_id, ns.all, ns.peek_xlsx, ns.profile)
     return 2
 
 
-def _probe(source_id: str | None, everything: bool, peek_xlsx: bool = False) -> int:
+def _probe(
+    source_id: str | None, everything: bool, peek_xlsx: bool = False, profile: bool = False
+) -> int:
     from .fetch import FetchBlocked, FetchError, probe_source
     from .probe import summarize
     from .xlsx_peek import UnsafeWorkbook
@@ -96,12 +103,17 @@ def _probe(source_id: str | None, everything: bool, peek_xlsx: bool = False) -> 
             targets += list(src.probe_urls)
         for target in targets:
             try:
-                is_xlsx = peek_xlsx and bool(target) and str(target).lower().endswith(".xlsx")
-                if peek_xlsx and not is_xlsx:
+                is_xlsx = (
+                    (peek_xlsx or profile)
+                    and bool(target)
+                    and str(target).lower().endswith(".xlsx")
+                )
+                if (peek_xlsx or profile) and not is_xlsx:
                     continue
                 body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
                 if is_xlsx:
-                    from .xlsx_peek import compact_report, peek
+                    from .queue import LBNL_2026_PROFILE
+                    from .xlsx_peek import compact_report, peek, profile_lines, profile_sheet
 
                     head = summarize(man, headers, body)
                     print(
@@ -109,7 +121,10 @@ def _probe(source_id: str | None, everything: bool, peek_xlsx: bool = False) -> 
                             {k: head[k] for k in ("source_id", "final_url", "bytes", "sha256")}
                         )
                     )
-                    print("\n".join(compact_report(peek(body, max_rows=10))))
+                    if profile:
+                        print("\n".join(profile_lines(profile_sheet(body, **LBNL_2026_PROFILE))))
+                    else:
+                        print("\n".join(compact_report(peek(body, max_rows=10))))
                     continue
                 report = summarize(man, headers, body)
                 print(json.dumps(report, indent=1, ensure_ascii=False))

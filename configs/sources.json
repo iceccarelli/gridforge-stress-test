@@ -15,7 +15,7 @@
         "xlsx",
         "pdf"
       ],
-      "acquisition_method": "manual_download",
+      "acquisition_method": "http_download",
       "release_identity": "Queued Up: 2026 Edition, Characteristics of Power Plants Seeking Transmission Interconnection As of the End of 2025. Data file path /sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx on eta-publications.lbl.gov; server declares 15,571,236 bytes (Content-Length, GitHub Actions probe run 40580149328; not downloaded). Report PDF /sites/default/files/2026-06/queued_up_2026_edition.pdf. Page text: ~8,200 projects actively seeking grid connection as of end of 2025. The publication page's Last-Modified header differed between two reads on 2026-10-27, so it is not used as a release date.",
       "license_attribution": "Page text: 'The Queued Up data file is licensed CC BY 4.0. You may use, share, or adapt the dataset as long as you attribute it to Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker.'",
       "semantics": "Project-level interconnection queue data file for projects seeking transmission interconnection as of end of 2025 (publisher description)",
@@ -27,12 +27,16 @@
         "Data as of end of 2025: a snapshot, not a forecast",
         "Queue statistic is not a data-centre load-connection probability",
         "emp.lbl.gov (incl. /queues) returns HTTP 403 to automated requests (probe run 40579353392); eta-publications.lbl.gov serves the same publication page",
-        "Workbook not yet downloaded: declared size 15,571,236 bytes (above the 3 MB probe cap, below the 25 MB registry cap); sheet names, columns, codebook and units are UNVERIFIED"
+        "Workbook layout OBSERVED (GitHub Actions probe run 40615136879 (2026-10-28); sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6, 15,571,236 bytes): 43 visible sheets. '03. Complete Queue Data' (dimension A1:AD38203) is the project-level table: row 1 'RETURN TO CONTENTS', row 2 the 30 column names q_id, q_status, q_date, prop_date, on_date, wd_date, ia_date, IA_phase_raw, IA_phase_clean, county, state, fips_code, poi_name, region, project_name, utility, entity, developer, cluster, service, project_type, type_1, type_2, type_3, type_clean, mw_1, mw_2, mw_3, q_year, prop_year. '04. Data Codebook' (A1:C32; Field Name | Description | Notes) is the data dictionary. Sheets '05'..'40' are report/chart aggregates, not projects.",
+        "Codebook rows READ so far: q_id ('Combine with \"entity\" to form a unique identifier across the full dataset'), q_status ('One of: active, withdrawn, suspended, or operational'), q_date (date project entered queue), prop_date (proposed online date; can be revised), on_date (date became operational, if applicable), wd_date (date withdrawn, if applicable). The remaining codebook rows, incl. units of mw_1..mw_3 and the meaning of type_1..3/type_clean, are UNVERIFIED.",
+        "Dates in the project sheet are published as numeric serials (e.g. 43511); the workbook's date epoch flag (date1904) has not been read: the 1900 system is assumed, supported only by q_year agreeing with the serial in all six rows read",
+        "Publisher note (sheet '28. IR to WD'): withdrawn date was available for 15,248 requests withdrawn since 2004: withdrawn requests without wd_date exist. In the six rows read, every withdrawn row has a blank wd_date and one operational row has a blank on_date.",
+        "The 'sample' notes on aggregate sheets (e.g. 'Sample includes 4,205 projects from 7 ISO/RTOs and 7 non-ISO balancing...') show aggregates use subsets of requests; do not reuse them as denominators for the full table"
       ],
       "verification": {
         "status": "publisher_page_read",
         "checked_on": "2026-10-27",
-        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) in GitHub Actions probe run 40579353392 and again in GitHub Actions probe run 40580149328: title, licence wording and data-file link taken from the page; workbook Content-Length from GitHub Actions probe run 40580149328. The locator emp.lbl.gov/queues returned HTTP 403 in both runs and was NOT read."
+        "basis": "Publication page on eta-publications.lbl.gov read (HTTP 200, 24,196 bytes) in GitHub Actions probe run 40579353392 and again in GitHub Actions probe run 40580149328: title, licence wording and data-file link taken from the page; workbook Content-Length from GitHub Actions probe run 40580149328. The locator emp.lbl.gov/queues returned HTTP 403 in both runs and was NOT read. Workbook downloaded in memory and its sheet layout, headers and codebook rows read in GitHub Actions probe run 40615136879 (2026-10-28) (step 'Peek at registered workbooks'); contents of rows beyond the first six and of codebook rows beyond wd_date were not read."
       },
       "live_fetch": "disabled_until_verified",
       "allowed_content_types": [

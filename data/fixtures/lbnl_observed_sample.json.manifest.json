@@ -1,0 +1,28 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "lbnl-queued-up",
+  "source_url": "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx",
+  "origin": "source_derived_fixture",
+  "retrieved_at": "2026-10-28T01:27:32Z",
+  "retrieval_status": "not_attempted",
+  "response_status": 200,
+  "sha256": "6549702e19471054831c4e3bd210c0235a19b18185f2ac82ae2389ba066998d8",
+  "byte_count": 4782,
+  "record_count": 6,
+  "time_coverage": null,
+  "upstream_release": "Queued Up 2026 Edition data file lbnl_ix_queue_data_file_thru2025.xlsx (15,571,236 bytes, sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6), sheet '03. Complete Queue Data', first six data rows, as printed by GitHub Actions probe run 40615136879 on 2026-10-28",
+  "units": {
+    "capacity": "mw_1 column; unit not stated in the rows read (UNVERIFIED)",
+    "dates": "numeric serials as published"
+  },
+  "transformations": [
+    "rows copied verbatim from the probe log (cells truncated at 80 chars by the peek; none of these cells reached that length)",
+    "trailing blank cells that the log strips were restored as empty strings to the 30 header columns",
+    "no values edited, derived or imputed"
+  ],
+  "limitations": [
+    "SOURCE-DERIVED SAMPLE of 6 rows: not representative of the 38,2xx-row dataset (all six are Arizona Public Service / entity APS)",
+    "Values are as published by LBNL/GridTracker; a withdrawn row here has a blank wd_date, matching the publisher's note that withdrawal dates exist for only part of withdrawn requests"
+  ],
+  "attribution": "Data: Queued Up 2026 Edition data file, licensed CC BY 4.0. Attribution required: Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker."
+}
