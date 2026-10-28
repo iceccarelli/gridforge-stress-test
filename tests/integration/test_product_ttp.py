@@ -20,6 +20,7 @@ from gridforge_stress.product_adapter import (
     claim_violations,
     compare,
     product_dir,
+    product_required,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.product]
@@ -32,7 +33,7 @@ def intake():
     try:
         product_dir()
     except ProductUnavailable as exc:
-        pytest.skip(str(exc))
+        (pytest.fail if product_required() else pytest.skip)(str(exc))
     return json.loads(INTAKE.read_text())
 
 

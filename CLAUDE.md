@@ -16,7 +16,9 @@ Time-to-Power product. It is NOT a second implementation of the product.
 `gridforge-stress doctor|sources list|scenarios list|validate-fixtures`.
 `gridforge-stress bridge <intake.json>` sets the product's grid-wait assumption beside observed queue history (context only).
 `gridforge-stress mcp` serves the harness as an MCP server over stdio (see README; `.mcp.json`).
-Live, read-only evidence (needs outbound network; in practice run via the `probe` workflow): `gridforge-stress probe <id>|--all [--peek-xlsx]`.
+Live, read-only evidence (needs outbound network; in practice run via the `probe` workflow): `gridforge-stress probe <id>|--all [--peek-xlsx]`
+(exit 0 = read or policy-blocked, 3 = a target was NOT_READ; `data_urls` are dataset downloads, inspected only on explicit request).
+`GRIDFORGE_PRODUCT_DIR`, when set, is authoritative: an invalid value fails (no fallback) and the product tests fail rather than skip.
 
 ## Source-integrity rules (non-negotiable)
 1. A source is "verified" only if a publisher page was actually read; record `verification.status` honestly.

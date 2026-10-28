@@ -5,9 +5,8 @@
       "id": "lbnl-queued-up",
       "name": "LBNL Queued Up",
       "owner": "Lawrence Berkeley National Laboratory (data compiled with GridTracker)",
-      "locator": "https://emp.lbl.gov/queues",
+      "locator": "https://eta-publications.lbl.gov/publications/us-interconnection-queue-data-0",
       "allowed_hosts": [
-        "emp.lbl.gov",
         "eta-publications.lbl.gov"
       ],
       "access_status": "public",
@@ -26,7 +25,7 @@
       "limitations": [
         "Data as of end of 2025: a snapshot, not a forecast",
         "Queue statistic is not a data-centre load-connection probability",
-        "emp.lbl.gov (incl. /queues) returns HTTP 403 to automated requests (probe run 40579353392); eta-publications.lbl.gov serves the same publication page",
+        "The human landing page https://emp.lbl.gov/queues returned HTTP 403 to automated requests (probe runs 40579353392 and 40580149328) and is therefore NOT registered; the locator is the official publication page on eta-publications.lbl.gov, which was read (HTTP 200)",
         "Workbook layout OBSERVED (GitHub Actions probe run 40615136879 (2026-10-28); sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6, 15,571,236 bytes): 43 visible sheets. '03. Complete Queue Data' (dimension A1:AD38203) is the project-level table: row 1 'RETURN TO CONTENTS', row 2 the 30 column names q_id, q_status, q_date, prop_date, on_date, wd_date, ia_date, IA_phase_raw, IA_phase_clean, county, state, fips_code, poi_name, region, project_name, utility, entity, developer, cluster, service, project_type, type_1, type_2, type_3, type_clean, mw_1, mw_2, mw_3, q_year, prop_year. '04. Data Codebook' (A1:C32; Field Name | Description | Notes) is the data dictionary. Sheets '05'..'40' are report/chart aggregates, not projects.",
         "Codebook rows READ so far: q_id ('Combine with \"entity\" to form a unique identifier across the full dataset'), q_status ('One of: active, withdrawn, suspended, or operational'), q_date (date project entered queue), prop_date (proposed online date; can be revised), on_date (date became operational, if applicable), wd_date (date withdrawn, if applicable). The remaining codebook rows, incl. units of mw_1..mw_3 and the meaning of type_1..3/type_clean, are UNVERIFIED.",
         "Dates in the project sheet are published as numeric serials (e.g. 43511); the workbook's date epoch flag (date1904) has not been read: the 1900 system is assumed, supported only by q_year agreeing with the serial in all six rows read",
@@ -53,8 +52,8 @@
         "application/pdf"
       ],
       "max_bytes": 26214400,
-      "probe_urls": [
-        "https://eta-publications.lbl.gov/publications/us-interconnection-queue-data-0",
+      "probe_urls": [],
+      "data_urls": [
         "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx"
       ]
     },

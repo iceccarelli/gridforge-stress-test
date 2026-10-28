@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .doctor import product_checkout
+from .doctor import product_checkout, product_override
 
 _RUNNER = r"""
 import json, os, sys
@@ -44,10 +44,20 @@ class ProductUnavailable(RuntimeError):
     pass
 
 
+def product_required() -> bool:
+    """True when the operator named a checkout explicitly: its absence is a failure, never a skip."""
+    return bool(product_override())
+
+
 def product_dir() -> Path:
     p = product_checkout()
     if p is None:
-        raise ProductUnavailable("GridForge-AI checkout not found; set GRIDFORGE_PRODUCT_DIR")
+        explicit = product_override()
+        raise ProductUnavailable(
+            f"GRIDFORGE_PRODUCT_DIR={explicit} is not a GridForge-AI checkout"
+            if explicit
+            else "GridForge-AI checkout not found; set GRIDFORGE_PRODUCT_DIR"
+        )
     return p
 
 

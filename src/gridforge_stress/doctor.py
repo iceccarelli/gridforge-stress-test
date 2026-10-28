@@ -19,15 +19,25 @@ from .registry import RegistryError, default_sources, load_scenarios, load_sourc
 PRODUCT_ENV = "GRIDFORGE_PRODUCT_DIR"
 
 
+def product_override(env: Mapping[str, str] | None = None) -> str:
+    """The operator's explicit GRIDFORGE_PRODUCT_DIR, or "" when unset."""
+    return (os.environ if env is None else env).get(PRODUCT_ENV, "").strip()
+
+
 def product_checkout(env: Mapping[str, str] | None = None) -> Path | None:
-    env_map = os.environ if env is None else env
-    candidates = [
-        env_map.get(PRODUCT_ENV, ""),
-        str(Path(__file__).resolve().parents[3] / "GridForge-AI"),
-        "/workspaces/GridForge-AI",
-    ]
+    """The GridForge-AI checkout to test against.
+
+    An explicit GRIDFORGE_PRODUCT_DIR is authoritative: if it does not point at a checkout the result is
+    None, never a different checkout found by default search (which would test something other than asked).
+    """
+    explicit = product_override(env)
+    candidates = (
+        [explicit]
+        if explicit
+        else [str(Path(__file__).resolve().parents[3] / "GridForge-AI"), "/workspaces/GridForge-AI"]
+    )
     for c in candidates:
-        if c and (Path(c) / "gridforge" / "envelope" / "time_to_power.py").is_file():
+        if (Path(c) / "gridforge" / "envelope" / "time_to_power.py").is_file():
             return Path(c)
     return None
 
@@ -80,7 +90,16 @@ def run_doctor(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         add("fixtures", "fail", f"missing {fx}")
     prod = product_checkout(env_map)
     if prod is None:
-        add("product_checkout", "absent", f"not found; set {PRODUCT_ENV}")
+        explicit = product_override(env_map)
+        if explicit:
+            add(
+                "product_checkout",
+                "fail",
+                f"{PRODUCT_ENV}={explicit} is not a GridForge-AI checkout "
+                "(no gridforge/envelope/time_to_power.py); not falling back to another directory",
+            )
+        else:
+            add("product_checkout", "absent", f"not found; set {PRODUCT_ENV}")
     else:
         add(
             "product_checkout",

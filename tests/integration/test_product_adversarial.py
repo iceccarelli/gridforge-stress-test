@@ -13,7 +13,7 @@ import json
 import pytest
 
 from gridforge_stress.paths import fixtures_dir
-from gridforge_stress.product_adapter import ProductUnavailable, call, product_dir
+from gridforge_stress.product_adapter import ProductUnavailable, call, product_dir, product_required
 
 pytestmark = [pytest.mark.integration, pytest.mark.product]
 
@@ -23,7 +23,7 @@ def intake():
     try:
         product_dir()
     except ProductUnavailable as exc:
-        pytest.skip(str(exc))
+        (pytest.fail if product_required() else pytest.skip)(str(exc))
     return json.loads((fixtures_dir() / "product" / "reference_hall_intake.json").read_text())
 
 
@@ -165,7 +165,9 @@ def test_leader_stable_and_no_leader_on_tied_dates(intake):
 
 
 @pytest.mark.xfail(
-    strict=True, reason="product accepts contracted_MW > firm capacity without any caveat"
+    strict=True,
+    raises=AssertionError,  # a missing/broken product must error, not count as the expected gap
+    reason="product accepts contracted_MW > firm capacity without any caveat",
 )
 def test_contradictory_grid_inputs_should_be_flagged(intake):
     base = call("compare", {"intake": intake})["result"]["caveats"]
@@ -177,6 +179,7 @@ def test_contradictory_grid_inputs_should_be_flagged(intake):
 
 @pytest.mark.xfail(
     strict=True,
+    raises=AssertionError,
     reason="product coerces a numeric string for firm_capacity_MVA while rejecting bool",
 )
 def test_numeric_strings_should_be_refused(intake):

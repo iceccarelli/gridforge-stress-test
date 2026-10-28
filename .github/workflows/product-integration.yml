@@ -1,7 +1,10 @@
 name: product-integration
 
 # Opt-in: runs the harness against the real GridForge-AI engine. Not part of ordinary CI.
-# Needs a token able to read the product repository, supplied as the PRODUCT_REPO_TOKEN secret.
+# Read-only: it checks out the product at the ref you name and runs `pytest -m product`; it never pushes,
+# deploys or changes the product. The product repository is public, so the default workflow token is enough
+# and no secret is needed. If it ever becomes private, add a `token:` input to the product checkout (a
+# read-only contents token stored as a repository secret); see CONTRIBUTING.md.
 on:
   workflow_dispatch:
     inputs:
@@ -16,23 +19,17 @@ jobs:
   product:
     runs-on: ubuntu-latest
     steps:
-      - name: Require the product-repository secret
-        env:
-          PRODUCT_REPO_TOKEN: ${{ secrets.PRODUCT_REPO_TOKEN }}
-        run: |
-          if [ -z "$PRODUCT_REPO_TOKEN" ]; then
-            echo "::error::PRODUCT_REPO_TOKEN is not set. Add a read-only (contents) token for iceccarelli/GridForge-AI as a repository secret; this workflow cannot run without it."
-            exit 1
-          fi
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
           repository: iceccarelli/GridForge-AI
           ref: ${{ inputs.product_ref }}
           path: GridForge-AI
-          token: ${{ secrets.PRODUCT_REPO_TOKEN }}
+          persist-credentials: false
+      - name: Show exactly which product commit is under test
+        run: git -C GridForge-AI log -1 --format='product %H (%s)'
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --locked --all-groups
-      - run: uv run --locked pytest -m product
+      - run: uv run --locked pytest -m product -ra
         env:
           GRIDFORGE_PRODUCT_DIR: ${{ github.workspace }}/GridForge-AI

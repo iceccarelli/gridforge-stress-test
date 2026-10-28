@@ -8,7 +8,7 @@ read and which run read it; anything not shown stays `UNVERIFIED`.
 
 | id | access | publisher page read? | live fetch | key findings (see registry for sources) |
 |---|---|---|---|---|
-| lbnl-queued-up | public | yes, via `eta-publications.lbl.gov` (the locator `emp.lbl.gov/queues` returns 403 to automated requests) | disabled | CC BY 4.0, attribute LBNL + GridTracker; data through end of 2025; workbook declares 15,571,236 bytes; project sheet '03. Complete Queue Data' (38,201 rows, 30 columns); five measured statuses incl. `unknown` (codebook lists four); status/date conflicts exist in the data |
+| lbnl-queued-up | public | yes, via `eta-publications.lbl.gov` (now the registered locator; `emp.lbl.gov/queues` returns 403 to automated requests and is not registered) | disabled | CC BY 4.0, attribute LBNL + GridTracker; data through end of 2025; workbook declares 15,571,236 bytes; project sheet '03. Complete Queue Data' (38,201 rows, 30 columns); five measured statuses incl. `unknown` (codebook lists four); status/date conflicts exist in the data |
 | caiso-facility-library | public | yes | disabled | index of 14 documents incl. Cluster 16 POI PDFs and two xlsx |
 | caiso-pge-c16-poi | public | headers only (PDF text not extracted) | disabled | Last-Modified 2026-01-16; listing is not an allocation |
 | eia-930 | API key (`EIA_API_KEY`) | yes | disabled | hour-ending timestamps in each BA's chosen local time zone |
@@ -19,7 +19,24 @@ read and which run read it; anything not shown stays `UNVERIFIED`.
 | nws-api | public | yes | disabled | User-Agent with contact required |
 
 `live_fetch: enabled` is allowed only for a source whose publisher page was read AND with a tested reason; none is
-enabled. Reading a page is not the same as downloading or parsing its data: no live dataset has been parsed yet.
+enabled. Reading a page is not the same as downloading or parsing its data. The only dataset read so far is the LBNL workbook, inspected
+in memory by explicit request (`probe lbnl-queued-up --peek-xlsx|--profile|--queue-stats`); it was never stored or promoted to `fetched_validated`.
 
 To verify or extend a source: `gridforge-stress probe <id>` (or dispatch the `probe` workflow), read the output, update
 the registry fields the output supports, and cite the run in `verification.basis`.
+
+## Probe targets and outcomes
+
+A registry record separates what the probe may read: the locator and `probe_urls` are publisher **pages** (capped at 3 MB);
+`data_urls` are **dataset downloads**, never read by a page probe and only inspected in memory when asked explicitly
+(`--peek-xlsx`, `--profile`, `--queue-stats`), within the source's own `max_bytes` and the workbook safety limits.
+A URL cannot be both. Every printed record carries `source_id`, `url`, `kind` (`publisher_page` | `dataset_inspection`),
+`retrieval_status`, `at` and, when not read, the truthful `reason` and `http_status`.
+
+| outcome | meaning | effect on exit code |
+|---|---|---|
+| read | the target was fetched in memory and its content summarised | none |
+| `BLOCKED_BY_POLICY` | the registry deliberately gates the source (ERCOT `blocked_until_authorized`) | none: expected |
+| `NOT_READ` | HTTP error, redirect off the registry, non-public address, oversize, unsafe workbook, unknown id, or no registered dataset URL | exit 3: actionable |
+
+The last line printed is a `probe_summary` with the counts and this policy.
