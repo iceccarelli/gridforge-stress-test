@@ -583,3 +583,29 @@ def test_the_comparable_population_option_is_the_closest_of_the_two_measured():
     from gridforge_stress.queue import PUBLISHER_COMPARABLE_POPULATION
 
     assert PUBLISHER_COMPARABLE_POPULATION == "has_in_service_date"
+
+
+def test_the_context_fixture_pins_exactly_the_measured_numbers_and_is_attributed():
+    doc = json.loads((fixtures_dir() / "lbnl_ir_to_cod_context.json").read_text())
+    for key, mine in (
+        ("all_cod_years", OUR_RUN2["all_cod_years"]),
+        ("cod_2018_2025", OUR_RUN2["cod_2018_2025"]),
+    ):
+        c = doc["contexts"][key]
+        assert (c["n"], c["p25"], c["median"], c["p75"]) == (
+            mine["n"],
+            mine["p25_years"],
+            mine["median_years"],
+            mine["p75_years"],
+        )
+    assert (
+        "40639536058" in doc["provenance"]["ci_run"]
+        and "794582d3" in doc["provenance"]["workbook_sha256"]
+    )
+    man = json.loads((fixtures_dir() / "lbnl_ir_to_cod_context.json.manifest.json").read_text())
+    assert (
+        man["origin"] == "source_derived_fixture"
+        and "CC BY 4.0" in man["attribution"]
+        and "GridTracker" in man["attribution"]
+    )
+    assert "SOURCE-DERIVED" in " ".join(man["limitations"])

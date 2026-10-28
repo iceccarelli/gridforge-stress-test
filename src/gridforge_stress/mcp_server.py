@@ -184,6 +184,32 @@ def tool_product_call(args: Mapping[str, Any]) -> Any:
     return out
 
 
+def tool_context_bridge(args: Mapping[str, Any]) -> Any:
+    from .context_bridge import BridgeError, bridge
+    from .product_adapter import ProductUnavailable, call
+
+    intake = args["intake"]
+    if len(json.dumps(intake)) > MAX_PRODUCT_BODY_CHARS:
+        raise ToolError(f"intake larger than {MAX_PRODUCT_BODY_CHARS} characters")
+    try:
+        screened = call("screen", {"intake": intake}, tier="client")
+    except ProductUnavailable as exc:
+        raise ToolError(f"GridForge-AI product unavailable: {exc}") from exc
+    if not screened.get("ok"):
+        raise ToolError(
+            f"the product refused the intake: {screened.get('error')}: {screened.get('message')}"
+        )
+    try:
+        return bridge(
+            screened["result"],
+            intake,
+            context_key=args.get("context", "cod_2018_2025"),
+            region=args.get("region"),
+        )
+    except BridgeError as exc:
+        raise ToolError(str(exc)) from exc
+
+
 def tool_probe_source(args: Mapping[str, Any]) -> Any:
     if os.environ.get(LIVE_ENV) != "1":
         raise ToolError(
@@ -302,6 +328,21 @@ TOOLS: dict[str, dict[str, Any]] = {
             ["endpoint", "body"],
         ),
         "fn": tool_product_call,
+    },
+    "context_bridge": {
+        "description": "Run the REAL GridForge-AI screen on an intake, read the product's own grid-reinforcement lead-time assumption from it, and set it beside LBNL's observed US generation-queue request-to-in-service durations (attributed, source-derived). CONTEXT ONLY: it never changes the product's evidence class, is not a load-connection time, and is labelled 'scale reference only' unless the site is in the US.",
+        "schema": _schema(
+            {
+                "intake": {"type": "object"},
+                "context": {"enum": ["all_cod_years", "cod_2018_2025"]},
+                "region": {
+                    "type": "string",
+                    "description": "LBNL region, e.g. PJM, ERCOT, CAISO, West",
+                },
+            },
+            ["intake"],
+        ),
+        "fn": tool_context_bridge,
     },
     "probe_source": {
         "description": "OPERATOR-ENABLED ONLY (GRIDFORGE_STRESS_ALLOW_LIVE=1). Read-only look at a registered source's own page: status, content type, title, licence/credential/time-convention wording. No arbitrary URLs; ERCOT stays blocked.",

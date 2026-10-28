@@ -1,0 +1,29 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "lbnl-queued-up",
+  "source_url": "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx",
+  "origin": "source_derived_fixture",
+  "retrieved_at": "2026-10-28T05:43:04Z",
+  "retrieval_status": "not_attempted",
+  "response_status": 200,
+  "sha256": "702642d8721dc7f3d01ed48085677977020bbacfb4ce64947cd76f3588191a1d",
+  "byte_count": 2670,
+  "record_count": null,
+  "time_coverage": {
+    "queue_data_through": "2025-12-31",
+    "cod_years": "2018-2025 and all years"
+  },
+  "upstream_release": "Queued Up 2026 Edition data file (sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6); statistics computed by the harness in GitHub Actions probe run 40639536058",
+  "units": {
+    "duration": "years"
+  },
+  "transformations": [
+    "aggregate statistics (n, p25, median, p75) computed in memory from the published workbook; no request-level rows are stored",
+    "values copied verbatim from the CI log, rounded to 3 decimals by the harness"
+  ],
+  "limitations": [
+    "SOURCE-DERIVED AGGREGATES (not synthetic): US generation-queue durations conditioned on reaching commercial operation; operational-only population differs slightly from LBNL's any-status sample",
+    "not evidence about any specific site, utility or load connection"
+  ],
+  "attribution": "Data: Queued Up 2026 Edition data file, licensed CC BY 4.0. Attribution required: Lawrence Berkeley National Laboratory (subject to receipt of any required approvals from the U.S. Dept. of Energy) & GridTracker. Statistics derived by the gridforge-stress harness."
+}

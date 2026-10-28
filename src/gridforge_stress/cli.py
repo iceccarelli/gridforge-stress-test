@@ -23,6 +23,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         dest="sub", required=True
     )
     sc.add_parser("list")
+    br = sub.add_parser(
+        "bridge", help="set the product's grid-wait assumption beside observed queue history"
+    )
+    br.add_argument("intake", help="path to a GridForge intake JSON")
+    br.add_argument("--region", default=None)
+    br.add_argument(
+        "--context", default="cod_2018_2025", choices=["all_cod_years", "cod_2018_2025"]
+    )
     sub.add_parser("mcp", help="serve the harness as an MCP server over stdio")
     sub.add_parser("validate-fixtures", help="check fixture manifests, checksums, labels, content")
     f = sub.add_parser(
@@ -92,6 +100,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             json.dumps(man.to_dict(), indent=2),
             f"\n{len(body)} bytes (NOT stored: transport checks only; no content validator has run)",
         )
+        return 0
+    if ns.cmd == "bridge":
+        from pathlib import Path
+
+        from .context_bridge import BridgeError, bridge
+        from .product_adapter import ProductUnavailable, call
+
+        intake = json.loads(Path(ns.intake).read_text())
+        try:
+            screened = call("screen", {"intake": intake}, tier="client")
+            if not screened.get("ok"):
+                print(f"PRODUCT REFUSED: {screened.get('message')}", file=sys.stderr)
+                return 2
+            print(
+                json.dumps(
+                    bridge(screened["result"], intake, context_key=ns.context, region=ns.region),
+                    indent=1,
+                )
+            )
+        except (ProductUnavailable, BridgeError) as exc:
+            print(f"NOT BRIDGED: {exc}", file=sys.stderr)
+            return 2
         return 0
     if ns.cmd == "mcp":
         from .mcp_server import main as mcp_main
@@ -188,6 +218,33 @@ def _probe(
                             )
                             for yr, st in by_year["by_cod_year"].items():
                                 print(f"  {yr} n={st['n']} median_months={st['median_months']}")
+                        from datetime import date
+
+                        from .queue import cohort_outcomes
+
+                        anyp = duration_summary(
+                            recs,
+                            cod_year_min=2018,
+                            cod_year_max=2025,
+                            population="has_in_service_date",
+                        )
+                        print(
+                            json.dumps(
+                                {
+                                    "any_status_cod_2018_2025": anyp["overall"],
+                                    "excluded_order": anyp["excluded_impossible_date_order"],
+                                },
+                                sort_keys=True,
+                            )
+                        )
+                        for yr in range(2010, 2020):
+                            co = cohort_outcomes(recs, entry_year=yr, as_of=date(2026, 1, 1))
+                            print(
+                                f"cohort {yr}: entered={co['entered']} operational={co['operational']} "
+                                f"withdrawn={co['withdrawn']} active={co['active_censored']} "
+                                f"suspended={co['suspended_unresolved']} unknown={co['status_unknown']} "
+                                f"share_operational_of_resolved={co['share_operational_of_resolved']}"
+                            )
                     if show_sheets:
                         for name in show_sheets:
                             print("\n".join(show_sheet_lines(body, name)))

@@ -379,3 +379,21 @@ def test_parse_queue_rows_capacity_option_counts_requests_once(server):
     cap = out["capacity_summary"]
     assert cap["naive_row_sum"] == 300.0 and cap["deduplicated_sum"] == 200.0
     assert cap["double_counting_avoided_mw"] == 100.0 and out["flag_counts"]["duplicate_key"] == 2
+
+
+def test_context_bridge_tool_is_listed_validated_and_degrades_cleanly_without_a_product(
+    server, monkeypatch
+):
+    assert "context_bridge" in M.TOOLS
+    r = call(server, "context_bridge", {})
+    assert r["isError"] is True and "invalid arguments" in payload(r)["error"]
+    r = call(server, "context_bridge", {"intake": {}, "context": "bogus"})
+    assert r["isError"] is True and "invalid arguments" in payload(r)["error"]
+    from gridforge_stress import product_adapter as PA
+
+    def no_product(*a, **k):
+        raise PA.ProductUnavailable("not found")
+
+    monkeypatch.setattr(PA, "call", no_product)
+    r = call(server, "context_bridge", {"intake": {"site": {"country": "DE"}}})
+    assert r["isError"] is True and "product unavailable" in payload(r)["error"]

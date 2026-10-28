@@ -45,6 +45,14 @@ def _content_check(path: Path) -> list[Finding]:
                 Finding("rows_rejected", f"{len(rows) - len(recs)} observed rows rejected")
             )
         return found
+    if name == "lbnl_ir_to_cod_context.json":
+        from .context_bridge import BridgeError, load_queue_context
+
+        try:
+            load_queue_context(path)
+        except (BridgeError, KeyError, ValueError) as exc:
+            return [Finding("bad_queue_context", str(exc))]
+        return []
     if name == "poi_synthetic.json":
         bad = [p for p in load_json(path)["pois"] if classify_poi(p)["is_allocation"]]
         return [Finding("poi_promoted", f"{p['name']} classified as allocation") for p in bad]

@@ -30,6 +30,14 @@ claim gate against an evidence level) and `probe_source` (off unless the operato
 There is deliberately no tool that fetches an arbitrary URL. Inputs are schema-validated; failures are tool errors, never
 tracebacks.
 
+## Context bridge (queue history beside the product's own assumption)
+`uv run --locked gridforge-stress bridge path/to/intake.json [--region PJM]` runs the REAL GridForge-AI screen, reads the
+product's own grid-reinforcement lead-time assumption from it (260 weeks, band 150-520, evidence class E0 for the reference
+hall) and sets it beside LBNL's observed US generation-queue request-to-in-service durations (attributed, source-derived,
+`data/fixtures/lbnl_ir_to_cod_context.json`). It is CONTEXT ONLY: it never changes the product's evidence class, it is not a
+load-connection time, it is labelled "scale reference only" unless the site is in the US, and it refuses (never defaults)
+when the product payload lacks the assumption (e.g. the public tier). Also available as the MCP tool `context_bridge`.
+
 ## First working example
 `tests/integration/test_product_ttp.py` feeds a synthetic reference hall through the product's real
 `/v1/compare` handler and checks the date (160 weeks, set by the transformer lead time) against an independent
