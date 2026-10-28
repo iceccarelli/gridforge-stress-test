@@ -398,4 +398,5 @@ LBNL_2026_PROFILE: dict[str, Any] = {
     "order_checks": (("wd_date", "q_date"), ("on_date", "q_date"), ("on_date", "wd_date")),
     "dup_key": ("entity", "q_id"),
     "dup_exclude": {"q_id": "not assigned"},
+    "dup_value_col": "mw_1",
 }

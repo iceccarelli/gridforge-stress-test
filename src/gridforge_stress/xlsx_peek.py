@@ -233,6 +233,7 @@ def profile_sheet(
     order_checks: tuple[tuple[str, str], ...] = (),
     dup_key: tuple[str, ...] = (),
     dup_exclude: dict[str, str] | None = None,
+    dup_value_col: str | None = None,
 ) -> dict[str, Any]:
     """Profile named columns. `blank_checks`: (when_col, when_value, blank_col) counts rows where the first equals the
     value and the last is blank. `order_checks`: (a, b) counts rows where both are numeric and a < b.
@@ -273,6 +274,8 @@ def profile_sheet(
     index = {name: i for i, name in names.items()}
     wanted = set(columns) | {x for c in blank_checks for x in (c[0], c[2])}
     wanted |= {x for c in order_checks for x in c} | set(dup_key) | set(dup_exclude or {})
+    if dup_value_col:
+        wanted.add(dup_value_col)
     missing = sorted(wanted - set(index))
     if missing:
         raise UnsafeWorkbook(f"columns not in header: {missing}")
@@ -373,6 +376,23 @@ def profile_sheet(
                 sorted(differing_cols.items(), key=lambda kv: (-kv[1], kv[0]))[:8]
             ),
         }
+        if dup_value_col:
+            same = differ = 0
+            extra_sum = all_sum = 0.0
+            for ix in repeated.values():
+                col_vals = [num(table[j][dup_value_col]) for j in ix]
+                numeric = [v for v in col_vals if v is not None]
+                all_sum += sum(numeric)
+                extra_sum += sum(v for v in col_vals[1:] if v is not None)
+                if len(set(col_vals)) == 1:
+                    same += 1
+                else:
+                    differ += 1
+            dups["value_column"] = dup_value_col
+            dups["repeated_keys_value_identical"] = same
+            dups["repeated_keys_value_differing"] = differ
+            dups["value_sum_all_rows_in_repeated_keys"] = round(all_sum, 3)
+            dups["value_sum_on_non_first_rows"] = round(extra_sum, 3)
     return {
         "sheet": sheet_name,
         "header_row_index": header_at,
@@ -415,4 +435,11 @@ def profile_lines(result: dict[str, Any]) -> list[str]:
             f"  duplicate_key content: identical={d['repeated_keys_fully_identical']} "
             f"with_differences={d['repeated_keys_with_differences']} differing_columns_top={d['differing_columns_top']}"
         )
+        if "value_column" in d:
+            lines.append(
+                f"  duplicate_key {d['value_column']}: keys_identical={d['repeated_keys_value_identical']} "
+                f"keys_differing={d['repeated_keys_value_differing']} "
+                f"sum_all_rows_in_repeated_keys={d['value_sum_all_rows_in_repeated_keys']} "
+                f"sum_on_non_first_rows={d['value_sum_on_non_first_rows']}"
+            )
     return lines

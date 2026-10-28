@@ -94,6 +94,18 @@ MEASURED = {
     "mw_2_populated": 1_096,
     "mw_3_populated": 45,
     "non_generation_project_types": {"Surplus": 100, "Upgrade": 80, "Replacement": 21},
+    # run 40616451452 (extended profile; same workbook):
+    "mw_1_zero": 2,
+    "mw_1_negative": 16,
+    "withdrawn_rows_with_on_date": 24_221 - 23_964,
+    "operational_rows_with_wd_date": 4_789 - 4_775,
+    "suspended_rows_with_on_date": 668 - 663,
+    "unknown_rows_with_any_terminal_date": 0,
+    "repeated_keys_fully_identical": 0,
+    "repeated_keys_with_differences": 135,
+    "repeated_keys_county_differs": 134,
+    "repeated_keys_state_differs": 33,
+    "repeated_keys_on_date_differs": 79,
 }
 
 
@@ -260,3 +272,51 @@ def test_rows_that_cannot_be_placed_are_the_only_ones_rejected():
         parse_rows([{**base, "mw_1": "-75"}], LBNL_2026_MAP)[0] == []
     )  # a negative mw_1 exists (min -75)
     assert len(parse_rows([{**base, "q_status": "unknown"}], LBNL_2026_MAP)[0]) == 1
+
+
+def test_terminal_date_populations_reconcile_with_the_column_totals():
+    m = MEASURED
+    wd_total = 15_623  # non-blank wd_date over the sheet
+    on_total = 3_709  # non-blank on_date over the sheet
+    assert (
+        wd_total
+        == (24_221 - m["wd_date_blank_when_withdrawn"])
+        + m["active_rows_with_wd_date"]
+        + m["suspended_rows_with_wd_date"]
+        + m["operational_rows_with_wd_date"]
+        + m["unknown_rows_with_any_terminal_date"]
+    )
+    assert (
+        on_total
+        == (4_789 - m["on_date_blank_when_operational"])
+        + m["active_rows_with_on_date"]
+        + m["withdrawn_rows_with_on_date"]
+        + m["suspended_rows_with_on_date"]
+        + m["unknown_rows_with_any_terminal_date"]
+    )
+
+
+def test_repeated_keys_are_distinct_rows_not_copies_so_the_parser_keeps_every_row_and_the_count_matches():
+    """135 repeated keys, none identical (county differs in 134): they are NOT duplicate copies, so de-duplicating by key
+    would delete real rows. Capacity repeated across such rows is measured separately before any summing is allowed."""
+    assert MEASURED["repeated_keys_fully_identical"] == 0
+    assert MEASURED["repeated_keys_with_differences"] == MEASURED["repeated_entity_id_keys"]
+    assert MEASURED["repeated_keys_county_differs"] <= MEASURED["repeated_entity_id_keys"]
+    a = {
+        "q_id": "Q9",
+        "entity": "APS",
+        "q_status": "active",
+        "q_date": "43511",
+        "mw_1": "10",
+        "county": "A",
+    }
+    b = {**a, "county": "B"}
+    recs, _ = parse_rows([a, b], LBNL_2026_MAP)
+    assert len(recs) == 2 and all("duplicate_key" in r.flags for r in recs)
+
+
+def test_non_positive_capacity_rows_are_the_only_capacity_rejections_and_are_counted():
+    assert MEASURED["mw_1_zero"] + MEASURED["mw_1_negative"] == 18
+    base = {"q_id": "Q1", "entity": "APS", "q_status": "active", "q_date": "43511"}
+    for v, rejected in (("0", True), ("-1", True), ("0.5", False)):
+        assert (parse_rows([{**base, "mw_1": v}], LBNL_2026_MAP)[0] == []) is rejected

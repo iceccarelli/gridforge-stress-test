@@ -359,3 +359,47 @@ def test_profile_duplicate_content_on_the_main_synthetic_data():
     d = prof()["duplicate_key"]
     assert d["repeated_keys_fully_identical"] == 0 and d["repeated_keys_with_differences"] == 1
     assert d["differing_columns_top"] == {"mw_1": 1, "on_date": 1}
+
+
+def test_profile_measures_capacity_repeated_across_rows_of_one_key():
+    rows = [
+        ["Q1", "a", "40000", "", "", "E", "10"],
+        [
+            "Q1",
+            "a",
+            "40000",
+            "",
+            "",
+            "E",
+            "10",
+        ],  # same key, same capacity (would be double counted if summed)
+        ["Q2", "a", "40000", "", "", "E", "10"],
+        ["Q2", "a", "40000", "", "", "E", "99"],  # same key, different capacity
+        ["Q3", "a", "40000", "", "", "E", "1"],
+    ]
+    d = X.profile_sheet(
+        make_data_workbook(rows),
+        "Data",
+        header_marker="q_id",
+        columns=("q_status",),
+        dup_key=("entity", "q_id"),
+        dup_value_col="mw_1",
+    )["duplicate_key"]
+    assert (d["repeated_keys_value_identical"], d["repeated_keys_value_differing"]) == (1, 1)
+    assert d["value_sum_all_rows_in_repeated_keys"] == 10 + 10 + 10 + 99  # 129
+    assert d["value_sum_on_non_first_rows"] == 10 + 99  # 109
+    line = [
+        x
+        for x in X.profile_lines(
+            X.profile_sheet(
+                make_data_workbook(rows),
+                "Data",
+                header_marker="q_id",
+                columns=("q_status",),
+                dup_key=("entity", "q_id"),
+                dup_value_col="mw_1",
+            )
+        )
+        if "keys_identical" in x
+    ]
+    assert line and "sum_on_non_first_rows=109" in line[0]
