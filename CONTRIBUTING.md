@@ -9,8 +9,8 @@ silently repair or default data. Keep dependencies minimal; change them only wit
 
 ## Adding a source
 Add a record to `configs/sources.json` (schema `schemas/source.schema.json`). Leave `live_fetch` as
-`disabled_until_verified` and `verification.status` honest until you have read the publisher page; record the
-basis. Add tests in `tests/contracts`. Credentials are env-var names only.
+`disabled_until_verified` and `verification.status` honest until you have read the publisher page (use `probe`; cite the
+run in `verification.basis`). Add tests in `tests/contracts`. Credentials are env-var names only.
 
 ## Adding a scenario
 Add to `configs/scenarios.json` with `must_not_claim`, implement a validator module, add unit tests including

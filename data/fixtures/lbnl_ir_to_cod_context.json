@@ -1,0 +1,184 @@
+{
+ "schema": "gridforge-stress/queue-context/1",
+ "source_id": "lbnl-queued-up",
+ "evidence_kind": "generation_queue_statistic",
+ "geography": "US",
+ "population": "operational",
+ "unit": "years",
+ "definition": "Years from interconnection-request (queue) date to in-service date for OPERATIONAL generation/storage requests that have both dates; 48 requests with impossible date order excluded; conditioned on reaching commercial operation (survivorship). NOT a time-to-power for a load and NOT a data-centre connection time.",
+ "provenance": {
+  "measured_on": "2026-10-28",
+  "ci_run": "GitHub Actions probe run 40639536058",
+  "workbook_sha256": "794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6",
+  "workbook": "Queued Up 2026 Edition data file lbnl_ix_queue_data_file_thru2025.xlsx, sheet '03. Complete Queue Data' (data through end of 2025)",
+  "parser": "gridforge_stress.queue.duration_summary (population 'operational'); computed in memory in CI; no row-level data stored here",
+  "cross_check": "the harness's date/percentile arithmetic reproduces LBNL's published sheet-37 medians to 0.005 months where sample sizes are equal (run 40640016068); LBNL's own sample is the any-status population, which differs slightly from this operational-only one"
+ },
+ "contexts": {
+  "all_cod_years": {
+   "n": 3097,
+   "p25": 1.96,
+   "median": 3.581,
+   "p75": 5.183
+  },
+  "cod_2018_2025": {
+   "n": 1439,
+   "p25": 3.086,
+   "median": 4.394,
+   "p75": 5.844
+  }
+ },
+ "by_region_cod_2018_2025": {
+  "CAISO": {
+   "n": 96,
+   "p25": 6.329,
+   "median": 7.793,
+   "p75": 9.573
+  },
+  "ERCOT": {
+   "n": 376,
+   "p25": 2.488,
+   "median": 3.791,
+   "p75": 4.705
+  },
+  "MISO": {
+   "n": 147,
+   "p25": 3.425,
+   "median": 4.208,
+   "p75": 4.879
+  },
+  "NYISO": {
+   "n": 32,
+   "p25": 4.251,
+   "median": 5.034,
+   "p75": 6.603
+  },
+  "PJM": {
+   "n": 427,
+   "p25": 3.243,
+   "median": 4.893,
+   "p75": 6.45
+  },
+  "SPP": {
+   "n": 108,
+   "p25": 4.081,
+   "median": 4.806,
+   "p75": 6.756
+  },
+  "Southeast": {
+   "n": 189,
+   "p25": 2.998,
+   "median": 4.033,
+   "p75": 5.199
+  },
+  "West": {
+   "n": 64,
+   "p25": 1.651,
+   "median": 3.172,
+   "p75": 5.542
+  }
+ },
+ "limits": [
+  "US interconnection queues for generation/storage, not load interconnections",
+  "Survivorship: only requests that reached commercial operation are included; most requests in the dataset did not (the dataset records 24,221 withdrawn and 4,789 operational requests across all years); see the survivorship block for cohort outcomes",
+  "A queue duration says nothing about a specific site's network operator, tariff, study status or equipment delivery",
+  "Regions are LBNL's regional groupings, not network operators"
+ ],
+ "survivorship": {
+  "measured_in": "GitHub Actions probe run 40642980669 (same workbook sha256 as above)",
+  "any_status_cod_2018_2025": {
+   "n": 1815,
+   "p25": 3.086,
+   "median": 4.381,
+   "p75": 5.944,
+   "note": "any-status population: requests with both dates whatever their current status (the population that reproduces LBNL's own sheet 37 best); 50 impossible-order rows excluded"
+  },
+  "cohorts_by_entry_year": {
+   "2010": {
+    "entered": 1266,
+    "operational": 235,
+    "withdrawn": 1018,
+    "active": 10,
+    "suspended": 3,
+    "unknown": 0
+   },
+   "2011": {
+    "entered": 1000,
+    "operational": 170,
+    "withdrawn": 809,
+    "active": 15,
+    "suspended": 6,
+    "unknown": 0
+   },
+   "2012": {
+    "entered": 592,
+    "operational": 176,
+    "withdrawn": 397,
+    "active": 10,
+    "suspended": 8,
+    "unknown": 1
+   },
+   "2013": {
+    "entered": 687,
+    "operational": 207,
+    "withdrawn": 463,
+    "active": 13,
+    "suspended": 4,
+    "unknown": 0
+   },
+   "2014": {
+    "entered": 943,
+    "operational": 239,
+    "withdrawn": 666,
+    "active": 35,
+    "suspended": 3,
+    "unknown": 0
+   },
+   "2015": {
+    "entered": 1145,
+    "operational": 272,
+    "withdrawn": 800,
+    "active": 63,
+    "suspended": 10,
+    "unknown": 0
+   },
+   "2016": {
+    "entered": 1669,
+    "operational": 313,
+    "withdrawn": 1194,
+    "active": 144,
+    "suspended": 18,
+    "unknown": 0
+   },
+   "2017": {
+    "entered": 1866,
+    "operational": 316,
+    "withdrawn": 1258,
+    "active": 249,
+    "suspended": 43,
+    "unknown": 0
+   },
+   "2018": {
+    "entered": 2044,
+    "operational": 272,
+    "withdrawn": 1424,
+    "active": 289,
+    "suspended": 59,
+    "unknown": 0
+   },
+   "2019": {
+    "entered": 2329,
+    "operational": 264,
+    "withdrawn": 1475,
+    "active": 511,
+    "suspended": 79,
+    "unknown": 0
+   }
+  },
+  "mature_cohort_years": [
+   2010,
+   2015
+  ],
+  "cohort_note": "status as of the workbook (data through end of 2025); active/suspended/unknown requests are unresolved, not failures; later cohorts are right-censored"
+ }
+}

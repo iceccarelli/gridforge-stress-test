@@ -10,7 +10,7 @@ from .findings import Finding, errors
 from .hourly import validate_hourly
 from .manifest import sha256_hex
 from .poi import classify_poi
-from .queue import ColumnMap, parse_rows
+from .queue import LBNL_2026_MAP, ColumnMap, parse_rows
 from .registry import RegistryError, default_sources, load_json, validate_against
 from .scenarios_data import validate_tariff
 
@@ -37,6 +37,22 @@ def _content_check(path: Path) -> list[Finding]:
             load_json(path)["series"], as_of=datetime(2026, 3, 8, 10, tzinfo=UTC)
         )
         return f
+    if name == "lbnl_observed_sample.json":
+        rows = load_json(path)["rows"]
+        recs, found = parse_rows(rows, LBNL_2026_MAP)
+        if len(recs) != len(rows):
+            found.append(
+                Finding("rows_rejected", f"{len(rows) - len(recs)} observed rows rejected")
+            )
+        return found
+    if name == "lbnl_ir_to_cod_context.json":
+        from .context_bridge import BridgeError, load_queue_context
+
+        try:
+            load_queue_context(path)
+        except (BridgeError, KeyError, ValueError) as exc:
+            return [Finding("bad_queue_context", str(exc))]
+        return []
     if name == "poi_synthetic.json":
         bad = [p for p in load_json(path)["pois"] if classify_poi(p)["is_allocation"]]
         return [Finding("poi_promoted", f"{p['name']} classified as allocation") for p in bad]

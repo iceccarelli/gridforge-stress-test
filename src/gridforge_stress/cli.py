@@ -23,6 +23,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         dest="sub", required=True
     )
     sc.add_parser("list")
+    br = sub.add_parser(
+        "bridge", help="set the product's grid-wait assumption beside observed queue history"
+    )
+    br.add_argument("intake", help="path to a GridForge intake JSON")
+    br.add_argument("--region", default=None)
+    br.add_argument(
+        "--context", default="cod_2018_2025", choices=["all_cod_years", "cod_2018_2025"]
+    )
+    sub.add_parser("mcp", help="serve the harness as an MCP server over stdio")
     sub.add_parser("validate-fixtures", help="check fixture manifests, checksums, labels, content")
     f = sub.add_parser(
         "fetch", help="LIVE: fetch one registered source (opt-in; network + credentials)"
@@ -31,6 +40,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     pr = sub.add_parser("probe", help="LIVE, read-only: show what a source's publisher page says")
     pr.add_argument("source_id", nargs="?")
     pr.add_argument("--all", action="store_true")
+    pr.add_argument(
+        "--profile",
+        action="store_true",
+        help="for the registered LBNL workbook URL: bounded value profile of the observed columns",
+    )
+    pr.add_argument(
+        "--queue-stats",
+        action="store_true",
+        help="for the registered LBNL workbook URL: queue-entry to in-service durations computed in memory",
+    )
+    pr.add_argument(
+        "--show-sheet",
+        action="append",
+        default=[],
+        help="for a registered .xlsx probe URL: print the leading rows of this sheet (repeatable)",
+    )
+    pr.add_argument(
+        "--peek-xlsx",
+        action="store_true",
+        help="for registered .xlsx probe URLs: read within the source cap, in memory, print sheet layout",
+    )
     ns = p.parse_args(argv)
 
     if ns.cmd == "doctor":
@@ -71,14 +101,48 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\n{len(body)} bytes (NOT stored: transport checks only; no content validator has run)",
         )
         return 0
+    if ns.cmd == "bridge":
+        from pathlib import Path
+
+        from .context_bridge import BridgeError, bridge
+        from .product_adapter import ProductUnavailable, call
+
+        intake = json.loads(Path(ns.intake).read_text())
+        try:
+            screened = call("screen", {"intake": intake}, tier="client")
+            if not screened.get("ok"):
+                print(f"PRODUCT REFUSED: {screened.get('message')}", file=sys.stderr)
+                return 2
+            print(
+                json.dumps(
+                    bridge(screened["result"], intake, context_key=ns.context, region=ns.region),
+                    indent=1,
+                )
+            )
+        except (ProductUnavailable, BridgeError) as exc:
+            print(f"NOT BRIDGED: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    if ns.cmd == "mcp":
+        from .mcp_server import main as mcp_main
+
+        return mcp_main()
     if ns.cmd == "probe":
-        return _probe(ns.source_id, ns.all)
+        return _probe(ns.source_id, ns.all, ns.peek_xlsx, ns.profile, ns.queue_stats, ns.show_sheet)
     return 2
 
 
-def _probe(source_id: str | None, everything: bool) -> int:
+def _probe(
+    source_id: str | None,
+    everything: bool,
+    peek_xlsx: bool = False,
+    profile: bool = False,
+    queue_stats: bool = False,
+    show_sheets: list[str] | None = None,
+) -> int:
     from .fetch import FetchBlocked, FetchError, probe_source
     from .probe import summarize
+    from .xlsx_peek import UnsafeWorkbook
 
     registry = load_sources()
     ids = list(registry) if everything else [source_id or ""]
@@ -90,8 +154,107 @@ def _probe(source_id: str | None, everything: bool) -> int:
             targets += list(src.probe_urls)
         for target in targets:
             try:
-                body, man, headers = probe_source(sid, url=target)
-                print(json.dumps(summarize(man, headers, body), indent=1, ensure_ascii=False))
+                wants_workbook = peek_xlsx or profile or queue_stats or bool(show_sheets)
+                is_xlsx = wants_workbook and bool(target) and str(target).lower().endswith(".xlsx")
+                if wants_workbook and not is_xlsx:
+                    continue
+                body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
+                if is_xlsx:
+                    from .queue import (
+                        LBNL_2026_MAP,
+                        LBNL_2026_PROFILE,
+                        capacity_summary,
+                        duration_summary,
+                        parse_rows,
+                    )
+                    from .xlsx_peek import (
+                        compact_report,
+                        peek,
+                        profile_lines,
+                        profile_sheet,
+                        sheet_rows,
+                        show_sheet_lines,
+                    )
+
+                    head = summarize(man, headers, body)
+                    print(
+                        json.dumps(
+                            {k: head[k] for k in ("source_id", "final_url", "bytes", "sha256")}
+                        )
+                    )
+                    if queue_stats:
+                        rows = sheet_rows(
+                            body, LBNL_2026_PROFILE["sheet_name"], header_marker="q_id"
+                        )
+                        recs, found = parse_rows(rows, LBNL_2026_MAP)
+                        errs = sum(1 for f in found if f.severity == "error")
+                        print(f"parsed rows={len(rows)} kept={len(recs)} rejected={errs}")
+                        for span in ((None, None), (2018, 2025)):
+                            res = duration_summary(
+                                recs,
+                                cod_year_min=span[0],
+                                cod_year_max=span[1],
+                                group_by="region",
+                            )
+                            print(json.dumps(res, sort_keys=True))
+                        print(
+                            json.dumps({"capacity_summary": capacity_summary(recs)}, sort_keys=True)
+                        )
+                        for label, pop in (
+                            ("any_status", "has_in_service_date"),
+                            ("operational", "operational"),
+                        ):
+                            by_year = duration_summary(
+                                recs,
+                                cod_year_min=2005,
+                                cod_year_max=2025,
+                                group_by="cod_year",
+                                population=pop,
+                            )
+                            n_all = by_year["overall"].get("n")
+                            print(
+                                f"{label}_by_cod_year_2005_2025: overall_n={n_all} "
+                                f"excluded_order={by_year['excluded_impossible_date_order']}"
+                            )
+                            for yr, st in by_year["by_cod_year"].items():
+                                print(f"  {yr} n={st['n']} median_months={st['median_months']}")
+                        from datetime import date
+
+                        from .queue import cohort_outcomes
+
+                        anyp = duration_summary(
+                            recs,
+                            cod_year_min=2018,
+                            cod_year_max=2025,
+                            population="has_in_service_date",
+                        )
+                        print(
+                            json.dumps(
+                                {
+                                    "any_status_cod_2018_2025": anyp["overall"],
+                                    "excluded_order": anyp["excluded_impossible_date_order"],
+                                },
+                                sort_keys=True,
+                            )
+                        )
+                        for yr in range(2010, 2020):
+                            co = cohort_outcomes(recs, entry_year=yr, as_of=date(2026, 1, 1))
+                            print(
+                                f"cohort {yr}: entered={co['entered']} operational={co['operational']} "
+                                f"withdrawn={co['withdrawn']} active={co['active_censored']} "
+                                f"suspended={co['suspended_unresolved']} unknown={co['status_unknown']} "
+                                f"share_operational_of_resolved={co['share_operational_of_resolved']}"
+                            )
+                    if show_sheets:
+                        for name in show_sheets:
+                            print("\n".join(show_sheet_lines(body, name)))
+                    if profile:
+                        print("\n".join(profile_lines(profile_sheet(body, **LBNL_2026_PROFILE))))
+                    elif not (queue_stats or show_sheets):
+                        print("\n".join(compact_report(peek(body, max_rows=10))))
+                    continue
+                report = summarize(man, headers, body)
+                print(json.dumps(report, indent=1, ensure_ascii=False))
             except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
                 print(
                     json.dumps(
@@ -103,7 +266,7 @@ def _probe(source_id: str | None, everything: bool) -> int:
                         }
                     )
                 )
-            except FetchError as exc:
+            except (FetchError, UnsafeWorkbook) as exc:
                 failures += 1
                 print(
                     json.dumps(

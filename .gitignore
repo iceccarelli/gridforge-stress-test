@@ -22,3 +22,6 @@ data/snapshots/
 out/
 audit-requirements.txt
 probe-report.json
+probe-workbook.json
+probe-profile.txt
+probe-queue-stats.txt

@@ -23,8 +23,31 @@ jobs:
         run: |
           set -o pipefail
           uv run --locked gridforge-stress probe --all | tee probe-report.json
+      - name: Peek at registered workbooks (explicit; in memory, bounded by the source cap, nothing stored)
+        if: always() && github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress probe lbnl-queued-up --peek-xlsx | tee probe-workbook.json
+      - name: Profile the observed project sheet (bounded value counts; in memory, nothing stored)
+        if: always() && github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress probe lbnl-queued-up --profile | tee probe-profile.txt
+      - name: Queue durations and capacity computed in memory, plus the publisher's own IR-to-COD sheet for cross-checking
+        if: always() && github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress probe lbnl-queued-up --queue-stats --show-sheet "37. IR to COD - all" | tee probe-queue-stats.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: probe-report
-          path: probe-report.json
+          path: |
+            probe-report.json
+            probe-workbook.json
+            probe-profile.txt
+            probe-queue-stats.txt
+          if-no-files-found: ignore
