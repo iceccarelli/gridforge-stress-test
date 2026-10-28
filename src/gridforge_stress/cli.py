@@ -37,6 +37,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="for the registered LBNL workbook URL: bounded value profile of the observed columns",
     )
     pr.add_argument(
+        "--queue-stats",
+        action="store_true",
+        help="for the registered LBNL workbook URL: queue-entry to in-service durations computed in memory",
+    )
+    pr.add_argument(
+        "--show-sheet",
+        action="append",
+        default=[],
+        help="for a registered .xlsx probe URL: print the leading rows of this sheet (repeatable)",
+    )
+    pr.add_argument(
         "--peek-xlsx",
         action="store_true",
         help="for registered .xlsx probe URLs: read within the source cap, in memory, print sheet layout",
@@ -82,12 +93,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if ns.cmd == "probe":
-        return _probe(ns.source_id, ns.all, ns.peek_xlsx, ns.profile)
+        return _probe(ns.source_id, ns.all, ns.peek_xlsx, ns.profile, ns.queue_stats, ns.show_sheet)
     return 2
 
 
 def _probe(
-    source_id: str | None, everything: bool, peek_xlsx: bool = False, profile: bool = False
+    source_id: str | None,
+    everything: bool,
+    peek_xlsx: bool = False,
+    profile: bool = False,
+    queue_stats: bool = False,
+    show_sheets: list[str] | None = None,
 ) -> int:
     from .fetch import FetchBlocked, FetchError, probe_source
     from .probe import summarize
@@ -103,17 +119,26 @@ def _probe(
             targets += list(src.probe_urls)
         for target in targets:
             try:
-                is_xlsx = (
-                    (peek_xlsx or profile)
-                    and bool(target)
-                    and str(target).lower().endswith(".xlsx")
-                )
-                if (peek_xlsx or profile) and not is_xlsx:
+                wants_workbook = peek_xlsx or profile or queue_stats or bool(show_sheets)
+                is_xlsx = wants_workbook and bool(target) and str(target).lower().endswith(".xlsx")
+                if wants_workbook and not is_xlsx:
                     continue
                 body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
                 if is_xlsx:
-                    from .queue import LBNL_2026_PROFILE
-                    from .xlsx_peek import compact_report, peek, profile_lines, profile_sheet
+                    from .queue import (
+                        LBNL_2026_MAP,
+                        LBNL_2026_PROFILE,
+                        duration_summary,
+                        parse_rows,
+                    )
+                    from .xlsx_peek import (
+                        compact_report,
+                        peek,
+                        profile_lines,
+                        profile_sheet,
+                        sheet_rows,
+                        show_sheet_lines,
+                    )
 
                     head = summarize(man, headers, body)
                     print(
@@ -121,9 +146,27 @@ def _probe(
                             {k: head[k] for k in ("source_id", "final_url", "bytes", "sha256")}
                         )
                     )
+                    if queue_stats:
+                        rows = sheet_rows(
+                            body, LBNL_2026_PROFILE["sheet_name"], header_marker="q_id"
+                        )
+                        recs, found = parse_rows(rows, LBNL_2026_MAP)
+                        errs = sum(1 for f in found if f.severity == "error")
+                        print(f"parsed rows={len(rows)} kept={len(recs)} rejected={errs}")
+                        for span in ((None, None), (2018, 2025)):
+                            res = duration_summary(
+                                recs,
+                                cod_year_min=span[0],
+                                cod_year_max=span[1],
+                                group_by="region",
+                            )
+                            print(json.dumps(res, sort_keys=True))
+                    if show_sheets:
+                        for name in show_sheets:
+                            print("\n".join(show_sheet_lines(body, name)))
                     if profile:
                         print("\n".join(profile_lines(profile_sheet(body, **LBNL_2026_PROFILE))))
-                    else:
+                    elif not (queue_stats or show_sheets):
                         print("\n".join(compact_report(peek(body, max_rows=10))))
                     continue
                 report = summarize(man, headers, body)

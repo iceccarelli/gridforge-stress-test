@@ -443,3 +443,61 @@ def profile_lines(result: dict[str, Any]) -> list[str]:
                 f"sum_on_non_first_rows={d['value_sum_on_non_first_rows']}"
             )
     return lines
+
+
+def sheet_rows(data: bytes, sheet_name: str, *, header_marker: str) -> list[dict[str, str]]:
+    """Every data row of one sheet as {header: value}, strings as published. In memory; same safety bounds."""
+    if not data.startswith(b"PK"):
+        raise UnsafeWorkbook("not a zip/xlsx container")
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        _check_archive(zf)
+        path = _sheet_path(zf, sheet_name)
+        raw_rows: list[list[tuple[int, str, str]]] = []
+        with _open_xml(zf, path) as fh:
+            for _, el in ET.iterparse(fh, events=("end",)):  # noqa: S314
+                if el.tag == f"{{{_NS['m']}}}row":
+                    raw_rows.append(_row_cells(el))
+                    el.clear()
+                    if len(raw_rows) >= MAX_PROFILE_ROWS:
+                        break
+        needed = {int(t) for row in raw_rows for _, ty, t in row if ty == "s" and t.isdigit()}
+        strings = _shared_strings(zf, needed)
+
+    def val(cell: tuple[int, str, str]) -> str:
+        _, ty, t = cell
+        return strings.get(int(t), "") if ty == "s" and t.isdigit() else t
+
+    header_at = next(
+        (
+            i
+            for i, row in enumerate(raw_rows[:HEADER_SCAN_ROWS])
+            if any(val(c) == header_marker for c in row)
+        ),
+        None,
+    )
+    if header_at is None:
+        raise UnsafeWorkbook(f"header marker {header_marker!r} not found")
+    names = {c[0]: val(c) for c in raw_rows[header_at]}
+    out = []
+    for row in raw_rows[header_at + 1 :]:
+        by_col = {c[0]: val(c) for c in row}
+        out.append({name: by_col.get(i, "") for i, name in names.items()})
+    return out
+
+
+def show_sheet_lines(data: bytes, sheet_name: str, *, max_rows: int = 60) -> list[str]:
+    """All leading rows of one named sheet, one line per row (empty trailing cells dropped)."""
+    res = peek(data, max_rows=max_rows)
+    for sh in res["sheets"]:
+        if sh["name"] == sheet_name:
+            lines = [
+                f"--- {sheet_name!r} dim={sh.get('dimension')} rows={sh.get('rows_counted')} ---"
+            ]
+            for row in sh["leading_rows"]:
+                cells = list(row)
+                while cells and not cells[-1]:
+                    cells.pop()
+                if cells:
+                    lines.append("  " + " | ".join(cells))
+            return lines
+    raise UnsafeWorkbook(f"no sheet named {sheet_name!r}")

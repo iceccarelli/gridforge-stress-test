@@ -337,6 +337,85 @@ def cohort_outcomes(
     }
 
 
+def percentile(sorted_values: list[float], q: float) -> float:
+    """Linear-interpolation percentile (the common 'type 7' definition), q in [0, 1]."""
+    if not sorted_values:
+        raise ValueError("no values")
+    if not 0 <= q <= 1:
+        raise ValueError("q must be within [0, 1]")
+    h = (len(sorted_values) - 1) * q
+    lo, hi = math.floor(h), math.ceil(h)
+    return sorted_values[lo] + (h - lo) * (sorted_values[hi] - sorted_values[lo])
+
+
+def duration_summary(
+    records: Iterable[QueueRecord],
+    *,
+    cod_year_min: int | None = None,
+    cod_year_max: int | None = None,
+    group_by: str | None = None,
+) -> dict[str, Any]:
+    """Years from queue entry (IR) to in-service date (COD) among OPERATIONAL requests that have both dates.
+
+    Excluded, with counts disclosed: rows with impossible date order; rows sharing a (entity, id) key beyond the
+    first (one request listed per location must not be counted once per row). The result is conditioned on
+    reaching COD (survivorship): it is NOT the time a request takes in general, and says nothing about load
+    connections.
+    """
+    recs = list(records)
+    op = [r for r in recs if r.status == "operational" and r.in_service_date is not None]
+    conflicted = [r for r in op if FLAG_DATE_ORDER in r.flags]
+    seen: set[tuple[str, str]] = set()
+    kept: list[QueueRecord] = []
+    dup_dropped = 0
+    for r in op:
+        if FLAG_DATE_ORDER in r.flags:
+            continue
+        if FLAG_DUP_KEY in r.flags:
+            key = (r.entity or "", r.project_id)
+            if key in seen:
+                dup_dropped += 1
+                continue
+            seen.add(key)
+        kept.append(r)
+    if cod_year_min is not None:
+        kept = [r for r in kept if r.in_service_date and r.in_service_date.year >= cod_year_min]
+    if cod_year_max is not None:
+        kept = [r for r in kept if r.in_service_date and r.in_service_date.year <= cod_year_max]
+
+    def stats(rows: list[QueueRecord]) -> dict[str, Any]:
+        yrs = sorted(
+            (r.in_service_date - r.queue_date).days / 365.25 for r in rows if r.in_service_date
+        )
+        if not yrs:
+            return {"n": 0}
+        return {
+            "n": len(yrs),
+            "p25_years": round(percentile(yrs, 0.25), 3),
+            "median_years": round(percentile(yrs, 0.5), 3),
+            "p75_years": round(percentile(yrs, 0.75), 3),
+            "min_years": round(yrs[0], 3),
+            "max_years": round(yrs[-1], 3),
+        }
+
+    out: dict[str, Any] = {
+        "label": QUEUE_STAT_LABEL,
+        "definition": "years from queue entry to in-service date, operational requests with both dates; "
+        "conditioned on reaching COD (survivorship); not a time-to-power for a load",
+        "cod_year_range": [cod_year_min, cod_year_max],
+        "operational_with_in_service_date": len(op),
+        "excluded_impossible_date_order": len(conflicted),
+        "excluded_repeated_key_rows": dup_dropped,
+        "overall": stats(kept),
+    }
+    if group_by:
+        groups: dict[str, list[QueueRecord]] = {}
+        for r in kept:
+            groups.setdefault(str(r.raw.get(group_by, "")) or "(blank)", []).append(r)
+        out["by_" + group_by] = {k: stats(v) for k, v in sorted(groups.items())}
+    return out
+
+
 #: Built ONLY from the observed 2026 workbook: sheet '03. Complete Queue Data' header row, the codebook text
 #: "q_status ... One of: active, withdrawn, suspended, or operational", and the measured distinct q_status values
 #: (those four PLUS 'unknown': 10 rows, not listed in the codebook). `mw_1` pairs with `type_1` in every observed row;

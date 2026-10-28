@@ -249,3 +249,80 @@ def test_cohort_discloses_rows_sharing_a_key():
     recs, _ = parse_rows([base(), base()], QUEUE_MAP)
     out = cohort_outcomes(recs, entry_year=2020, as_of=date(2026, 1, 1))
     assert out["entered"] == 2 and any("share an (entity, id) key" in w for w in out["warnings"])
+
+
+# --- durations (GF-002) ----------------------------------------------------------------------------------------
+
+
+def years(a: str, b: str) -> float:
+    return (date.fromisoformat(b) - date.fromisoformat(a)).days / 365.25
+
+
+def test_percentile_is_linear_interpolation_with_hand_computed_values():
+    from gridforge_stress.queue import percentile
+
+    xs = [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert percentile(xs, 0.0) == 1.0 and percentile(xs, 0.5) == 3.0 and percentile(xs, 1.0) == 5.0
+    assert percentile(xs, 0.25) == 2.0 and percentile(xs, 0.75) == 4.0
+    assert percentile([10.0, 20.0], 0.5) == 15.0 and percentile([7.0], 0.9) == 7.0
+    assert percentile([0.0, 10.0], 0.25) == 2.5
+    for bad in (-0.1, 1.1):
+        with pytest.raises(ValueError):
+            percentile(xs, bad)
+    with pytest.raises(ValueError):
+        percentile([], 0.5)
+
+
+def op(pid, entered, in_service, region="West", **kw):
+    return base(
+        proj=pid, stat="Operational", entered=entered, in_service=in_service, region=region, **kw
+    )
+
+
+def test_duration_summary_matches_hand_computed_quartiles_and_discloses_exclusions():
+    from gridforge_stress.queue import duration_summary
+
+    rows = [
+        op("a", "2015-01-01", "2018-01-01"),
+        op("b", "2015-01-01", "2020-01-01"),
+        op("c", "2015-01-01", "2022-01-01"),
+        op("d", "2015-01-01", "2024-01-01"),
+        op("rev", "2019-01-01", "2018-01-01"),  # impossible order: excluded, disclosed
+        base(proj="act", stat="Active"),  # not operational
+    ]
+    recs, _ = parse_rows(rows, QUEUE_MAP)
+    out = duration_summary(recs)
+    exp = sorted(
+        years("2015-01-01", d) for d in ("2018-01-01", "2020-01-01", "2022-01-01", "2024-01-01")
+    )
+    assert out["overall"]["n"] == 4 and out["excluded_impossible_date_order"] == 1
+    assert out["overall"]["median_years"] == pytest.approx((exp[1] + exp[2]) / 2, abs=1e-3)
+    assert out["overall"]["p25_years"] == pytest.approx(exp[0] + 0.75 * (exp[1] - exp[0]), abs=1e-3)
+    assert out["overall"]["min_years"] == pytest.approx(exp[0], abs=1e-3)
+    assert (
+        "not a time-to-power for a load" in out["definition"] and out["label"] == QUEUE_STAT_LABEL
+    )
+
+
+def test_duration_summary_counts_a_repeated_key_once_and_filters_by_cod_year_and_groups():
+    from dataclasses import replace
+
+    from gridforge_stress.queue import duration_summary
+
+    m = replace(QUEUE_MAP, entity="ent")
+    rows = [
+        {**op("x", "2015-01-01", "2019-01-01"), "ent": "E"},
+        {
+            **op("x", "2015-01-01", "2019-01-01"),
+            "ent": "E",
+        },  # same request listed again (another location)
+        {**op("y", "2015-01-01", "2023-01-01", region="PJM"), "ent": "E"},
+        {**op("z", "2010-01-01", "2012-01-01", region="PJM"), "ent": "E"},
+    ]
+    recs, _ = parse_rows(rows, m)
+    out = duration_summary(recs, group_by="region")
+    assert out["overall"]["n"] == 3 and out["excluded_repeated_key_rows"] == 1
+    assert out["by_region"]["West"]["n"] == 1 and out["by_region"]["PJM"]["n"] == 2
+    late = duration_summary(recs, cod_year_min=2018, cod_year_max=2025)
+    assert late["overall"]["n"] == 2 and late["cod_year_range"] == [2018, 2025]
+    assert duration_summary([])["overall"] == {"n": 0}

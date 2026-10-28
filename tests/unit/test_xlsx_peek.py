@@ -145,7 +145,7 @@ def test_compact_report_is_one_line_per_sheet_and_shows_doc_sheets_and_largest()
 # --- value profile ---------------------------------------------------------------------------------------------
 
 
-def make_data_workbook(rows: list[list[str]], header=None) -> bytes:
+def make_data_workbook(rows: list[list[str]], header=None, sheet_name: str = "Data") -> bytes:
     """SYNTHETIC workbook: row1 'RETURN TO CONTENTS', row2 header, then `rows` (strings; numeric-looking => numbers)."""
     header = header or ["q_id", "q_status", "q_date", "wd_date", "on_date", "entity", "mw_1"]
     strings: list[str] = []
@@ -175,7 +175,7 @@ def make_data_workbook(rows: list[list[str]], header=None) -> bytes:
     sheet = f'<worksheet xmlns="{M}"><sheetData>{"".join(xml_rows)}</sheetData></worksheet>'
     sst = "".join(f"<si><t>{s}</t></si>" for s in strings)
     parts = {
-        "xl/workbook.xml": f'<workbook xmlns="{M}" xmlns:r="{R}"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/workbook.xml": f'<workbook xmlns="{M}" xmlns:r="{R}"><sheets><sheet name="{sheet_name}" sheetId="1" r:id="rId1"/></sheets></workbook>',
         "xl/_rels/workbook.xml.rels": '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
         "xl/sharedStrings.xml": f'<sst xmlns="{M}">{sst}</sst>',
         "xl/worksheets/sheet1.xml": sheet,
@@ -403,3 +403,92 @@ def test_profile_measures_capacity_repeated_across_rows_of_one_key():
         if "keys_identical" in x
     ]
     assert line and "sum_on_non_first_rows=109" in line[0]
+
+
+LBNL_HEADER = [
+    "q_id",
+    "q_status",
+    "q_date",
+    "wd_date",
+    "on_date",
+    "entity",
+    "mw_1",
+    "type_clean",
+    "region",
+]
+
+
+def lbnl_like_workbook() -> bytes:
+    rows = [
+        [
+            "Q1",
+            "operational",
+            "42005",
+            "",
+            "43831",
+            "APS",
+            "10",
+            "Solar",
+            "West",
+        ],  # 2015-01-01 -> 2020-01-01
+        [
+            "Q2",
+            "operational",
+            "42005",
+            "",
+            "44927",
+            "APS",
+            "10",
+            "Wind",
+            "West",
+        ],  # 2015-01-01 -> 2023-01-01
+        ["Q3", "withdrawn", "42005", "42370", "", "APS", "10", "Solar", "West"],
+    ]
+    return make_data_workbook(rows, header=LBNL_HEADER, sheet_name="03. Complete Queue Data")
+
+
+def test_sheet_rows_returns_dicts_keyed_by_header_after_the_banner():
+    rows = X.sheet_rows(lbnl_like_workbook(), "03. Complete Queue Data", header_marker="q_id")
+    assert len(rows) == 3 and rows[0]["q_id"] == "Q1" and rows[2]["q_status"] == "withdrawn"
+    assert rows[0]["on_date"] == "43831" and rows[2]["on_date"] == ""
+    with pytest.raises(X.UnsafeWorkbook):
+        X.sheet_rows(lbnl_like_workbook(), "Nope", header_marker="q_id")
+
+
+def test_show_sheet_lines_prints_named_sheet_only_and_rejects_unknown():
+    lines = X.show_sheet_lines(lbnl_like_workbook(), "03. Complete Queue Data")
+    assert lines[0].startswith("--- '03. Complete Queue Data'") and any(
+        "q_id | q_status" in x for x in lines
+    )
+    with pytest.raises(X.UnsafeWorkbook):
+        X.show_sheet_lines(lbnl_like_workbook(), "missing")
+
+
+def test_cli_queue_stats_computes_durations_from_the_workbook_in_memory(monkeypatch, capsys):
+    import json as _json
+
+    from gridforge_stress import cli
+
+    wb = lbnl_like_workbook()
+
+    def fake_probe(sid, url=None, allow_large=False, **kw):
+        man = F.Manifest(
+            source_id=sid,
+            source_url=url or "",
+            origin="live_fetch",
+            retrieval_status="fetched_unparsed",
+            attribution="a",
+            byte_count=len(wb),
+        )
+        return wb, man, {"content-type": "x"}
+
+    monkeypatch.setattr(F, "probe_source", fake_probe)
+    assert cli.main(["probe", "lbnl-queued-up", "--queue-stats"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[1].startswith("parsed rows=3 kept=3 rejected=0")
+    overall = _json.loads(out[2])
+    assert overall["overall"]["n"] == 2 and overall["by_region"]["West"]["n"] == 2
+    expected = sorted(
+        [(5 * 365 + 1) / 365.25, (8 * 365 + 2) / 365.25]
+    )  # 2015-01-01 -> 2020-01-01 and -> 2023-01-01
+    assert overall["overall"]["median_years"] == pytest.approx(sum(expected) / 2, abs=1e-3)
