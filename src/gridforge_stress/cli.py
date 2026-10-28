@@ -101,11 +101,17 @@ def _probe(source_id: str | None, everything: bool, peek_xlsx: bool = False) -> 
                     continue
                 body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
                 if is_xlsx:
-                    from .xlsx_peek import peek
+                    from .xlsx_peek import compact_report, peek
 
-                    report = {**summarize(man, headers, body), "workbook": peek(body)}
-                else:
-                    report = summarize(man, headers, body)
+                    head = summarize(man, headers, body)
+                    print(
+                        json.dumps(
+                            {k: head[k] for k in ("source_id", "final_url", "bytes", "sha256")}
+                        )
+                    )
+                    print("\n".join(compact_report(peek(body, max_rows=10))))
+                    continue
+                report = summarize(man, headers, body)
                 print(json.dumps(report, indent=1, ensure_ascii=False))
             except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
                 print(

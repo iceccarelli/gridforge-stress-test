@@ -159,3 +159,33 @@ def peek(data: bytes, *, max_rows: int = 6) -> dict[str, Any]:
                 }
             )
     return {"sheet_count": len(sheets), "sheets": sheets}
+
+
+_DOC_SHEET = re.compile(
+    r"code ?book|read ?me|definition|dictionary|legend|contents|about|notes|glossary", re.I
+)
+
+
+def compact_report(result: dict[str, Any], *, detail_rows: int = 8, largest: int = 3) -> list[str]:
+    """One short line per sheet, plus leading rows for the largest sheets and any documentation-like sheets."""
+    sheets = result["sheets"]
+    big = {
+        s["name"]
+        for s in sorted(sheets, key=lambda x: x.get("rows_counted", 0), reverse=True)[:largest]
+    }
+    lines = [f"sheet_count={result['sheet_count']}"]
+    for i, sh in enumerate(sheets):
+        lines.append(
+            f"[{i}] {sh['name']!r} state={sh.get('state')} dim={sh.get('dimension')} "
+            f"rows={sh.get('rows_counted')}"
+        )
+    for sh in sheets:
+        if "leading_rows" not in sh or not (sh["name"] in big or _DOC_SHEET.search(sh["name"])):
+            continue
+        lines.append(f"--- leading rows of {sh['name']!r} ---")
+        for row in sh["leading_rows"][:detail_rows]:
+            cells = list(row)
+            while cells and not cells[-1]:
+                cells.pop()
+            lines.append("  " + " | ".join(cells))
+    return lines

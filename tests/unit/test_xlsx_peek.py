@@ -104,7 +104,8 @@ def test_cli_probe_peek_prints_workbook_layout_for_registered_xlsx_only(monkeypa
     monkeypatch.setattr(F, "probe_source", fake_probe)
     assert cli.main(["probe", "lbnl-queued-up", "--peek-xlsx"]) == 0
     out = capsys.readouterr().out
-    assert '"Codebook"' in out and '"leading_rows"' in out
+    assert "'Codebook' state=hidden" in out and "leading rows of 'Data'" in out
+    assert "id | status | MW" in out
     assert seen and all(u.endswith(".xlsx") and big for u, big in seen)
 
 
@@ -128,3 +129,14 @@ def test_allow_large_uses_the_registry_cap_not_the_probe_cap():
     assert got["cap"] == cap > F.PROBE_MAX_BYTES
     F.probe_source("lbnl-queued-up", url=url, resolver=lambda h: ["93.184.216.34"], transport=spy)
     assert got["cap"] == F.PROBE_MAX_BYTES
+
+
+def test_compact_report_is_one_line_per_sheet_and_shows_doc_sheets_and_largest():
+    lines = X.compact_report(X.peek(make_xlsx(rows=3), max_rows=3), detail_rows=2, largest=1)
+    assert lines[0] == "sheet_count=2"
+    assert lines[1].startswith("[0] 'Data'") and "rows=4" in lines[1]
+    assert any("leading rows of 'Data'" in x for x in lines)
+    assert any("leading rows of 'Codebook'" in x for x in lines), (
+        "codebook-like names are always detailed"
+    )
+    assert not any("," in x and "[" in x and x.startswith("  [") for x in lines)
