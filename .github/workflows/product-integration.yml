@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       product_ref:
-        description: GridForge-AI ref (branch, tag or commit) to test against
+        description: GridForge-AI branch, tag or FULL commit SHA to test against (a short SHA failed to check out in run 40660996540)
         required: true
 
 permissions:
