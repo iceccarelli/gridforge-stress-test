@@ -46,25 +46,58 @@ def fixture_records():
         (base(entered=""), "missing_queue_date"),
         (base(mw="abc"), "bad_capacity"),
         (base(mw="-5"), "bad_capacity"),
+        (base(mw="0"), "bad_capacity"),
         (base(mw="nan"), "bad_capacity"),
         (base(mw="inf"), "bad_capacity"),
-        (base(stat="Withdrawn", withdrawn="2019-01-01"), "lifecycle_contradiction"),
-        (
-            base(stat="Withdrawn", withdrawn="2021-01-01", in_service="2022-01-01"),
-            "lifecycle_contradiction",
-        ),
-        (base(stat="Operational", in_service="2019-01-01"), "lifecycle_contradiction"),
-        (
-            base(stat="Operational", in_service="2021-01-01", withdrawn="2022-01-01"),
-            "lifecycle_contradiction",
-        ),
-        (base(stat="Active", in_service="2021-01-01"), "lifecycle_contradiction"),
-        (base(stat="Active", withdrawn="2021-01-01"), "lifecycle_contradiction"),
     ],
 )
-def test_malformed_and_contradictory_rows_flagged_not_repaired(row, code):
+def test_rows_that_cannot_be_placed_are_rejected_with_an_error(row, code):
     recs, f = parse_rows([row], QUEUE_MAP)
-    assert code in {x.code for x in f} and recs == []
+    assert recs == [] and [(x.code, x.severity) for x in f] == [(code, "error")]
+
+
+@pytest.mark.parametrize(
+    "row,code,flag",
+    [
+        (
+            base(stat="Withdrawn", withdrawn="2019-01-01"),
+            "date_order_conflict",
+            "date_order_conflict",
+        ),
+        (
+            base(stat="Operational", in_service="2019-01-01"),
+            "date_order_conflict",
+            "date_order_conflict",
+        ),
+        (
+            base(stat="Withdrawn", withdrawn="2021-01-01", in_service="2022-01-01"),
+            "status_date_conflict",
+            "status_date_conflict",
+        ),
+        (
+            base(stat="Operational", in_service="2021-01-01", withdrawn="2022-01-01"),
+            "status_date_conflict",
+            "status_date_conflict",
+        ),
+        (
+            base(stat="Active", in_service="2021-01-01"),
+            "status_date_conflict",
+            "status_date_conflict",
+        ),
+        (
+            base(stat="Active", withdrawn="2021-01-01"),
+            "status_date_conflict",
+            "status_date_conflict",
+        ),
+    ],
+)
+def test_conflicts_are_flagged_and_kept_never_dropped_or_repaired(row, code, flag):
+    """Measured on the real LBNL data: 158 'active' rows carry an in-service date, 20 carry a withdrawal date, 50 have
+    on_date < q_date, 6 have wd_date < q_date. Rejecting them would delete real publisher rows."""
+    recs, f = parse_rows([row], QUEUE_MAP)
+    assert len(recs) == 1 and flag in recs[0].flags
+    assert code in {x.code for x in f} and all(x.severity == "warning" for x in f)
+    assert recs[0].raw == row, "original values must be untouched"
 
 
 @pytest.mark.parametrize(
@@ -78,12 +111,15 @@ def test_missing_terminal_dates_are_warnings_and_the_row_is_kept(row, code):
     """The publisher states withdrawal dates exist for only part of withdrawn requests: dropping or erroring on
     them would delete real records."""
     recs, f = parse_rows([row], QUEUE_MAP)
-    assert len(recs) == 1
+    assert len(recs) == 1 and code in recs[0].flags
     assert [(x.code, x.severity) for x in f] == [(code, "warning")]
 
 
-def test_duplicate_ids_flagged():
-    assert "duplicate_id" in codes([base(), base()])
+def test_repeated_keys_keep_every_copy_flagged_because_identical_copies_cannot_be_told_from_distinct_requests():
+    recs, f = parse_rows([base(), base()], QUEUE_MAP)
+    assert len(recs) == 2 and all("duplicate_key" in r.flags for r in recs)
+    assert [x.code for x in f] == ["duplicate_id", "duplicate_id"]
+    assert all(x.severity == "warning" for x in f)
 
 
 def test_original_values_preserved():
@@ -115,15 +151,14 @@ def test_immature_cohort_flagged_and_empty_cohort_has_no_false_precision():
 
 def test_duplicate_key_is_entity_and_id_not_id_alone():
     a = base(proj="Q1", stat="Active")
-    b = dict(a)
-    # same id, different entity: distinct requests. QUEUE_MAP has no entity column, so use a map with one.
     from dataclasses import replace
 
     m = replace(QUEUE_MAP, entity="ent")
-    recs, f = parse_rows([{**a, "ent": "APS"}, {**b, "ent": "PG&E"}], m)
+    recs, f = parse_rows([{**a, "ent": "APS"}, {**a, "ent": "PG&E"}], m)
     assert len(recs) == 2 and not [x for x in f if x.code == "duplicate_id"]
-    recs, f = parse_rows([{**a, "ent": "APS"}, {**b, "ent": "APS"}], m)
-    assert len(recs) == 1 and "duplicate_id" in {x.code for x in f}
+    assert not any("duplicate_key" in r.flags for r in recs)
+    recs, f = parse_rows([{**a, "ent": "APS"}, {**a, "ent": "APS"}], m)
+    assert len(recs) == 2 and all("duplicate_key" in r.flags for r in recs)
 
 
 def test_unassigned_id_literal_is_kept_with_a_warning_and_never_deduplicated():
@@ -181,3 +216,36 @@ def test_operational_without_in_service_date_is_reported_and_excluded_from_durat
     out = cohort_outcomes(recs, entry_year=2020, as_of=date(2026, 1, 1))
     assert out["median_years_queue_to_service_among_operational"] is None
     assert any("no in-service date" in w for w in out["warnings"])
+
+
+def test_status_the_codebook_does_not_list_is_mapped_only_when_evidence_says_so():
+    from dataclasses import replace
+
+    rows = [base(proj="a", stat="unknown")]
+    assert [x.code for x in parse_rows(rows, QUEUE_MAP)[1]] == [
+        "unknown_status"
+    ]  # not mapped => rejected loudly
+    m = replace(QUEUE_MAP, status_map={**QUEUE_MAP.status_map, "unknown": "unknown"})
+    recs, f = parse_rows(rows, m)
+    assert recs[0].status == "unknown" and not f
+    out = cohort_outcomes(recs, entry_year=2020, as_of=date(2026, 1, 1))
+    assert out["status_unknown"] == 1 and out["share_operational_of_resolved"] is None
+    assert any("'unknown'" in w for w in out["warnings"])
+
+
+def test_impossible_date_order_is_excluded_from_durations_and_the_exclusion_is_disclosed():
+    good = base(proj="g", stat="Operational", entered="2018-01-01", in_service="2021-01-01")
+    bad = base(proj="b", stat="Operational", entered="2018-06-01", in_service="2017-01-01")
+    recs, _ = parse_rows([good, bad], QUEUE_MAP)
+    out = cohort_outcomes(recs, entry_year=2018, as_of=date(2026, 1, 1))
+    assert out["operational"] == 2, "the flagged row still counts as operational"
+    assert out["durations_used"] == 1 and out[
+        "median_years_queue_to_service_among_operational"
+    ] == pytest.approx(3.0, abs=0.01)
+    assert any("impossible order" in w for w in out["warnings"])
+
+
+def test_cohort_discloses_rows_sharing_a_key():
+    recs, _ = parse_rows([base(), base()], QUEUE_MAP)
+    out = cohort_outcomes(recs, entry_year=2020, as_of=date(2026, 1, 1))
+    assert out["entered"] == 2 and any("share an (entity, id) key" in w for w in out["warnings"])

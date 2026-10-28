@@ -321,3 +321,41 @@ def test_profile_lines_are_compact_and_cli_profile_wires_through(monkeypatch, ca
     assert cli.main(["probe", "lbnl-queued-up", "--profile"]) == 0
     out = capsys.readouterr().out
     assert "profile of 'Data'" in out and "'withdrawn':4" in out
+
+
+def test_profile_numeric_zero_and_negative_counts():
+    rows = [
+        ["Q1", "a", "40000", "", "", "E", "-75"],
+        ["Q2", "a", "40000", "", "", "E", "0"],
+        ["Q3", "a", "40000", "", "", "E", "5"],
+    ]
+    c = X.profile_sheet(make_data_workbook(rows), "Data", header_marker="q_id", columns=("mw_1",))[
+        "columns"
+    ]["mw_1"]
+    assert (c["numeric_min"], c["numeric_zero"], c["numeric_negative"]) == (-75.0, 1, 1)
+
+
+def test_profile_tells_identical_copies_from_differing_ones_and_names_the_columns():
+    rows = [
+        ["Q1", "a", "40000", "", "", "E", "10"],
+        ["Q1", "a", "40000", "", "", "E", "10"],  # identical copy of the row above
+        ["Q2", "a", "40000", "", "", "E", "10"],
+        ["Q2", "a", "40000", "", "", "E", "99"],  # same key, different capacity
+        ["Q3", "a", "40000", "", "", "E", "1"],
+    ]
+    d = X.profile_sheet(
+        make_data_workbook(rows),
+        "Data",
+        header_marker="q_id",
+        columns=("q_status",),
+        dup_key=("entity", "q_id"),
+    )["duplicate_key"]
+    assert d["keys_repeated"] == 2 and d["rows_in_repeated_keys"] == 4
+    assert d["repeated_keys_fully_identical"] == 1 and d["repeated_keys_with_differences"] == 1
+    assert d["differing_columns_top"] == {"mw_1": 1}
+
+
+def test_profile_duplicate_content_on_the_main_synthetic_data():
+    d = prof()["duplicate_key"]
+    assert d["repeated_keys_fully_identical"] == 0 and d["repeated_keys_with_differences"] == 1
+    assert d["differing_columns_top"] == {"mw_1": 1, "on_date": 1}

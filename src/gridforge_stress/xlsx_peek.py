@@ -278,9 +278,12 @@ def profile_sheet(
         raise UnsafeWorkbook(f"columns not in header: {missing}")
     body = raw_rows[header_at + 1 :]
     table: list[dict[str, str]] = []
+    all_idx = sorted(names)
+    full_rows: list[tuple[str, ...]] = []
     for row in body:
         by_col = {c[0]: val(c) for c in row}
         table.append({name: by_col.get(index[name], "") for name in wanted})
+        full_rows.append(tuple(by_col.get(i, "") for i in all_idx))
 
     def num(x: str) -> float | None:
         try:
@@ -307,6 +310,8 @@ def profile_sheet(
         }
         if nb and len(nums) == len(nb):
             entry["numeric_min"], entry["numeric_max"] = min(nums), max(nums)
+            entry["numeric_zero"] = sum(1 for n in nums if n == 0)
+            entry["numeric_negative"] = sum(1 for n in nums if n < 0)
         out_cols[col] = entry
     checks = []
     for when, value, blank in blank_checks:
@@ -333,20 +338,40 @@ def profile_sheet(
     dups: dict[str, Any] = {}
     if dup_key:
         excl = dup_exclude or {}
-        keys: dict[tuple[str, ...], int] = {}
+        keys: dict[tuple[str, ...], list[int]] = {}
         skipped = 0
-        for r in table:
+        for n, r in enumerate(table):
             if any(r[c] == lit for c, lit in excl.items()):
                 skipped += 1
                 continue
             k = tuple(r[c] for c in dup_key)
-            keys[k] = keys.get(k, 0) + 1
+            keys.setdefault(k, []).append(n)
+        repeated = {k: ix for k, ix in keys.items() if len(ix) > 1}
+        identical = 0
+        differing_cols: dict[str, int] = {}
+        for ix in repeated.values():
+            first = full_rows[ix[0]]
+            if all(full_rows[j] == first for j in ix[1:]):
+                identical += 1
+                continue
+            seen_diff: set[str] = set()
+            for j in ix[1:]:
+                for pos, (a, b) in enumerate(zip(first, full_rows[j], strict=True)):
+                    if a != b:
+                        seen_diff.add(names[all_idx[pos]])
+            for col_name in seen_diff:
+                differing_cols[col_name] = differing_cols.get(col_name, 0) + 1
         dups = {
             "key": list(dup_key),
             "excluded_rows": skipped,
             "distinct_keys": len(keys),
-            "keys_repeated": sum(1 for n in keys.values() if n > 1),
-            "rows_in_repeated_keys": sum(n for n in keys.values() if n > 1),
+            "keys_repeated": len(repeated),
+            "rows_in_repeated_keys": sum(len(ix) for ix in repeated.values()),
+            "repeated_keys_fully_identical": identical,
+            "repeated_keys_with_differences": len(repeated) - identical,
+            "differing_columns_top": dict(
+                sorted(differing_cols.items(), key=lambda kv: (-kv[1], kv[0]))[:8]
+            ),
         }
     return {
         "sheet": sheet_name,
@@ -365,7 +390,11 @@ def profile_lines(result: dict[str, Any]) -> list[str]:
     ]
     for name, c in result["columns"].items():
         top = ", ".join(f"{k!r}:{v}" for k, v in list(c["top_values"].items())[:12])
-        rng = f" min={c['numeric_min']} max={c['numeric_max']}" if "numeric_min" in c else ""
+        rng = (
+            f" min={c['numeric_min']} max={c['numeric_max']} zero={c['numeric_zero']} negative={c['numeric_negative']}"
+            if "numeric_min" in c
+            else ""
+        )
         lines.append(
             f"  {name}: non_blank={c['non_blank']} blank={c['blank']} distinct={c['distinct_total']}{rng} top=[{top}]"
         )
@@ -381,5 +410,9 @@ def profile_lines(result: dict[str, Any]) -> list[str]:
         d = result["duplicate_key"]
         lines.append(
             f"  duplicate_key {d['key']}: distinct={d['distinct_keys']} repeated={d['keys_repeated']} rows_in_repeated={d['rows_in_repeated_keys']} excluded={d['excluded_rows']}"
+        )
+        lines.append(
+            f"  duplicate_key content: identical={d['repeated_keys_fully_identical']} "
+            f"with_differences={d['repeated_keys_with_differences']} differing_columns_top={d['differing_columns_top']}"
         )
     return lines

@@ -66,6 +66,37 @@ CODEBOOK_SEEN = {
 }
 
 
+# MEASURED 2026-10-28 from GitHub Actions probe run 40615868160 (step "Profile the observed project sheet"), same
+# workbook sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6. Counts over the whole sheet.
+MEASURED_DATA_ROWS = 38_201
+MEASURED_STATUS_COUNTS = {
+    "withdrawn": 24_221,
+    "active": 8_513,
+    "operational": 4_789,
+    "suspended": 668,
+    "unknown": 10,
+}
+MEASURED = {
+    "q_date_blank": 665,  # rows that cannot be placed in an entry-year cohort
+    "wd_date_blank_when_withdrawn": 8_639,
+    "on_date_blank_when_operational": 1_500,
+    "active_rows_with_wd_date": 8_513 - 8_493,
+    "active_rows_with_on_date": 8_513 - 8_355,
+    "suspended_rows_with_wd_date": 668 - 661,
+    "wd_before_q_date": (6, 15_414),  # (violating, rows with both dates)
+    "on_before_q_date": (50, 3_566),
+    "on_before_wd_date": (56, 241),
+    "distinct_entity_id_keys": 38_065,
+    "repeated_entity_id_keys": 135,
+    "rows_in_repeated_keys": 270,
+    "unassigned_id_rows": 1,
+    "mw_1_min": -75.0,
+    "mw_2_populated": 1_096,
+    "mw_3_populated": 45,
+    "non_generation_project_types": {"Surplus": 100, "Upgrade": 80, "Replacement": 21},
+}
+
+
 def test_observed_header_has_30_columns_matching_the_sheet_dimension():
     assert len(OBSERVED_HEADER) == 30 == 26 + 4  # 'AD' is column 30
     assert OBSERVED_DATA_DIMENSION.endswith("AD38203")
@@ -88,11 +119,14 @@ def test_column_map_uses_only_observed_columns():
     assert used <= set(OBSERVED_HEADER), used - set(OBSERVED_HEADER)
 
 
-def test_status_vocabulary_is_exactly_the_one_the_codebook_states():
-    stated = {"active", "withdrawn", "suspended", "operational"}
+def test_status_map_covers_exactly_the_measured_values_and_the_data_disagrees_with_the_codebook():
+    codebook = {"active", "withdrawn", "suspended", "operational"}
     assert "One of: active, withdrawn, suspended, or operational" in CODEBOOK_SEEN["q_status"]
-    assert set(LBNL_2026_MAP.status_map) == stated
-    assert set(LBNL_2026_MAP.status_map.values()) == stated
+    assert set(MEASURED_STATUS_COUNTS) == codebook | {"unknown"}, (
+        "the data has a fifth status the codebook omits"
+    )
+    assert set(LBNL_2026_MAP.status_map) == set(MEASURED_STATUS_COUNTS)
+    assert sum(MEASURED_STATUS_COUNTS.values()) == MEASURED_DATA_ROWS
 
 
 def test_codebook_says_id_is_unique_only_together_with_entity():
@@ -166,3 +200,63 @@ def test_real_profile_spec_is_callable_and_uses_only_observed_columns():
     )
     assert spec["header_marker"] in OBSERVED_HEADER
     assert used <= set(OBSERVED_HEADER), used - set(OBSERVED_HEADER)
+
+
+def test_measured_numbers_are_internally_consistent():
+    """Arithmetic over the pinned measurements, so a transcription error here is caught."""
+    m = MEASURED
+    assert m["active_rows_with_wd_date"] == 20 and m["active_rows_with_on_date"] == 158
+    assert m["suspended_rows_with_wd_date"] == 7
+    assert (
+        24_221 - m["wd_date_blank_when_withdrawn"] == 15_582
+    )  # withdrawn rows that DO have wd_date
+    assert 4_789 - m["on_date_blank_when_operational"] == 3_289
+    assert (
+        m["distinct_entity_id_keys"]
+        + m["unassigned_id_rows"]
+        + (m["rows_in_repeated_keys"] - m["repeated_entity_id_keys"])
+        == MEASURED_DATA_ROWS
+    )
+    assert m["rows_in_repeated_keys"] == 2 * m["repeated_entity_id_keys"]
+
+
+def test_parser_rules_are_consistent_with_what_the_real_data_contains():
+    """The measurements above mean these combinations EXIST in the publisher's data, so each must be kept and flagged,
+    never rejected: that is the contract between the measured data and the parser."""
+    base = {
+        "q_id": "Q1",
+        "entity": "APS",
+        "q_status": "active",
+        "q_date": "43511",
+        "wd_date": "",
+        "on_date": "",
+        "mw_1": "10",
+        "mw_2": "",
+        "mw_3": "",
+        "type_clean": "Solar",
+    }
+    cases = {
+        "active_with_on_date": {**base, "on_date": "44000"},
+        "active_with_wd_date": {**base, "wd_date": "44000"},
+        "suspended_with_wd_date": {**base, "q_status": "suspended", "wd_date": "44000"},
+        "operational_without_on_date": {**base, "q_status": "operational"},
+        "withdrawn_without_wd_date": {**base, "q_status": "withdrawn"},
+        "operational_before_queue_entry": {**base, "q_status": "operational", "on_date": "40000"},
+        "withdrawn_before_queue_entry": {**base, "q_status": "withdrawn", "wd_date": "40000"},
+        "status_unknown": {**base, "q_status": "unknown"},
+    }
+    for name, row in cases.items():
+        recs, findings = parse_rows([row], LBNL_2026_MAP)
+        assert len(recs) == 1, f"{name}: real publisher row was rejected"
+        assert not [f for f in findings if f.severity == "error"], name
+
+
+def test_rows_that_cannot_be_placed_are_the_only_ones_rejected():
+    base = {"q_id": "Q1", "entity": "APS", "q_status": "active", "q_date": "43511", "mw_1": "10"}
+    assert (
+        parse_rows([{**base, "q_date": ""}], LBNL_2026_MAP)[0] == []
+    )  # 665 such rows exist in the data
+    assert (
+        parse_rows([{**base, "mw_1": "-75"}], LBNL_2026_MAP)[0] == []
+    )  # a negative mw_1 exists (min -75)
+    assert len(parse_rows([{**base, "q_status": "unknown"}], LBNL_2026_MAP)[0]) == 1

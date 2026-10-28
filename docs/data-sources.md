@@ -8,7 +8,7 @@ read and which run read it; anything not shown stays `UNVERIFIED`.
 
 | id | access | publisher page read? | live fetch | key findings (see registry for sources) |
 |---|---|---|---|---|
-| lbnl-queued-up | public | yes, via `eta-publications.lbl.gov` (the locator `emp.lbl.gov/queues` returns 403 to automated requests) | disabled | CC BY 4.0, attribute LBNL + GridTracker; data through end of 2025; workbook declares 15,571,236 bytes; sheet layout: see probe run |
+| lbnl-queued-up | public | yes, via `eta-publications.lbl.gov` (the locator `emp.lbl.gov/queues` returns 403 to automated requests) | disabled | CC BY 4.0, attribute LBNL + GridTracker; data through end of 2025; workbook declares 15,571,236 bytes; project sheet '03. Complete Queue Data' (38,201 rows, 30 columns); five measured statuses incl. `unknown` (codebook lists four); status/date conflicts exist in the data |
 | caiso-facility-library | public | yes | disabled | index of 14 documents incl. Cluster 16 POI PDFs and two xlsx |
 | caiso-pge-c16-poi | public | headers only (PDF text not extracted) | disabled | Last-Modified 2026-01-16; listing is not an allocation |
 | eia-930 | API key (`EIA_API_KEY`) | yes | disabled | hour-ending timestamps in each BA's chosen local time zone |
