@@ -122,3 +122,35 @@ def test_lbnl_registry_states_what_was_and_was_not_read():
         "CC BY 4.0" in lbnl.raw["license_attribution"]
         and "GridTracker" in lbnl.raw["license_attribution"]
     )
+
+
+DATASET_SUFFIXES = (".xlsx", ".xls", ".csv", ".zip", ".json.gz", ".parquet")
+
+
+def test_pages_and_dataset_downloads_are_declared_separately():
+    reg = load_sources()
+    for sid, src in reg.items():
+        pages = (src.locator, *src.probe_urls)
+        assert not any(u.lower().split("?")[0].endswith(DATASET_SUFFIXES) for u in pages), sid
+        assert not set(pages) & set(src.data_urls), sid
+        for u in src.data_urls:
+            assert u.startswith("https://") and u.split("/")[2] in src.allowed_hosts, (sid, u)
+    lbnl = reg["lbnl-queued-up"]
+    assert lbnl.data_urls == (
+        "https://eta-publications.lbl.gov/sites/default/files/2026-05/lbnl_ix_queue_data_file_thru2025.xlsx",
+    )
+    assert lbnl.max_bytes >= 15_571_236  # the declared workbook size fits the registry cap
+    assert "emp.lbl.gov" not in lbnl.allowed_hosts  # the page that returns 403 is not registered
+    assert lbnl.locator.startswith("https://eta-publications.lbl.gov/publications/")
+
+
+def test_a_url_registered_as_both_page_and_dataset_is_rejected(tmp_path):
+    import json
+
+    doc = json.loads((configs_dir() / "sources.json").read_text())
+    rec = doc["sources"][0]
+    rec["data_urls"] = [rec["locator"]]
+    path = tmp_path / "sources.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(RegistryError, match="both a page and a dataset"):
+        load_sources(path)

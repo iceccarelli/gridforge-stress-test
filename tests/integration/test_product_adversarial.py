@@ -13,7 +13,7 @@ import json
 import pytest
 
 from gridforge_stress.paths import fixtures_dir
-from gridforge_stress.product_adapter import ProductUnavailable, call, product_dir
+from gridforge_stress.product_adapter import ProductUnavailable, call, product_dir, product_required
 
 pytestmark = [pytest.mark.integration, pytest.mark.product]
 
@@ -23,7 +23,7 @@ def intake():
     try:
         product_dir()
     except ProductUnavailable as exc:
-        pytest.skip(str(exc))
+        (pytest.fail if product_required() else pytest.skip)(str(exc))
     return json.loads((fixtures_dir() / "product" / "reference_hall_intake.json").read_text())
 
 
@@ -131,7 +131,7 @@ def test_capacity_is_monotone_in_firm_and_contracted_power_and_capped_by_the_sma
         racks(mutated(intake, lambda x, v=v: x["grid"].__setitem__("contracted_MW", v)))[
             "full_dlc_btm"
         ]
-        for v in (6.0, 12.0, 50.0, 10_000.0)
+        for v in (6.0, 12.0, 50.0, 5_000.0)  # 5,000 MW is the product's ceiling
     ]
     assert con == sorted(con)
     assert con[-2] == con[-1], "contracted MW above firm capacity must not buy extra compute"
@@ -165,7 +165,9 @@ def test_leader_stable_and_no_leader_on_tied_dates(intake):
 
 
 @pytest.mark.xfail(
-    strict=True, reason="product accepts contracted_MW > firm capacity without any caveat"
+    strict=True,
+    raises=AssertionError,  # a missing/broken product must error, not count as the expected gap
+    reason="product accepts contracted_MW > firm capacity without any caveat",
 )
 def test_contradictory_grid_inputs_should_be_flagged(intake):
     base = call("compare", {"intake": intake})["result"]["caveats"]
@@ -177,6 +179,7 @@ def test_contradictory_grid_inputs_should_be_flagged(intake):
 
 @pytest.mark.xfail(
     strict=True,
+    raises=AssertionError,
     reason="product coerces a numeric string for firm_capacity_MVA while rejecting bool",
 )
 def test_numeric_strings_should_be_refused(intake):

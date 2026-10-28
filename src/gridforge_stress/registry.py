@@ -65,6 +65,10 @@ class Source:
         return tuple(self.raw.get("probe_urls", ()))
 
     @property
+    def data_urls(self) -> tuple[str, ...]:
+        return tuple(self.raw.get("data_urls", ()))
+
+    @property
     def max_bytes(self) -> int:
         return int(self.raw.get("max_bytes", 5_000_000))
 
@@ -83,9 +87,14 @@ def load_sources(path: Path | None = None) -> dict[str, Source]:
         host = rec["locator"].split("/")[2].split(":")[0].lower()
         if host not in rec["allowed_hosts"]:
             raise RegistryError(f"{rec['id']}: locator host {host} not in allowed_hosts")
-        for extra in rec.get("probe_urls", []):
+        for extra in [*rec.get("probe_urls", []), *rec.get("data_urls", [])]:
             if extra.split("/")[2].split(":")[0].lower() not in rec["allowed_hosts"]:
-                raise RegistryError(f"{rec['id']}: probe url host not in allowed_hosts: {extra}")
+                raise RegistryError(
+                    f"{rec['id']}: probe/data url host not in allowed_hosts: {extra}"
+                )
+        pages = {rec["locator"], *rec.get("probe_urls", [])}
+        if pages & set(rec.get("data_urls", [])):
+            raise RegistryError(f"{rec['id']}: a URL cannot be both a page and a dataset download")
         if (
             rec["access_status"] in {"registration_required", "restricted"}
             and rec["live_fetch"] == "enabled"

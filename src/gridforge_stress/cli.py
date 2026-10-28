@@ -132,6 +132,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 2
 
 
+EXIT_POLICY = (
+    "exit 0: every probed target was read or deliberately policy-blocked (expected, not a failure); "
+    "exit 3: at least one target was NOT_READ (HTTP error, guard refusal, oversize, unsafe workbook, "
+    "unknown source or no registered dataset URL), which is actionable"
+)
+
+
+def _record(
+    sid: str, url: str | None, kind: str, probe: str, reason: str, http_status: int | None = None
+) -> dict[str, object]:
+    """A probe line for a target that was not read: identity, URL, status, time and the truthful reason."""
+    from .manifest import utc_now
+
+    return {
+        "source_id": sid,
+        "url": url,
+        "kind": kind,
+        "probe": probe,
+        "retrieval_status": "not_fetched",
+        "http_status": http_status,
+        "at": utc_now(),
+        "reason": reason,
+    }
+
+
 def _probe(
     source_id: str | None,
     everything: bool,
@@ -140,26 +165,33 @@ def _probe(
     queue_stats: bool = False,
     show_sheets: list[str] | None = None,
 ) -> int:
-    from .fetch import FetchBlocked, FetchError, probe_source
+    from .fetch import FetchError, PolicyBlocked, probe_source
     from .probe import summarize
     from .xlsx_peek import UnsafeWorkbook
 
     registry = load_sources()
     ids = list(registry) if everything else [source_id or ""]
-    failures = 0
+    tally = {"read": 0, "policy_blocked": 0, "not_read": 0}
+    wants_workbook = peek_xlsx or profile or queue_stats or bool(show_sheets)
+    kind = "dataset_inspection" if wants_workbook else "publisher_page"
     for sid in ids:
         src = registry.get(sid)
-        targets: list[str | None] = [None]
-        if src is not None:
-            targets += list(src.probe_urls)
+        targets: list[str | None]
+        if wants_workbook:
+            targets = [u for u in (src.data_urls if src else ()) if u.lower().endswith(".xlsx")]
+            if not targets:
+                tally["not_read"] += 1
+                reason = (
+                    "no registered .xlsx data_urls entry for this source (or unknown source id)"
+                )
+                print(json.dumps(_record(sid, None, kind, "NOT_READ", reason)))
+                continue
+        else:
+            targets = [src.locator, *src.probe_urls] if src else [None]
         for target in targets:
             try:
-                wants_workbook = peek_xlsx or profile or queue_stats or bool(show_sheets)
-                is_xlsx = wants_workbook and bool(target) and str(target).lower().endswith(".xlsx")
-                if wants_workbook and not is_xlsx:
-                    continue
-                body, man, headers = probe_source(sid, url=target, allow_large=is_xlsx)
-                if is_xlsx:
+                body, man, headers = probe_source(sid, url=target, dataset=wants_workbook)
+                if wants_workbook:
                     from .queue import (
                         LBNL_2026_MAP,
                         LBNL_2026_PROFILE,
@@ -252,28 +284,20 @@ def _probe(
                         print("\n".join(profile_lines(profile_sheet(body, **LBNL_2026_PROFILE))))
                     elif not (queue_stats or show_sheets):
                         print("\n".join(compact_report(peek(body, max_rows=10))))
+                    tally["read"] += 1
                     continue
                 report = summarize(man, headers, body)
                 print(json.dumps(report, indent=1, ensure_ascii=False))
-            except FetchBlocked as exc:  # policy refusal (e.g. ERCOT): expected, not a read failure
-                print(
-                    json.dumps(
-                        {
-                            "source_id": sid,
-                            "url": target,
-                            "probe": "BLOCKED_BY_POLICY",
-                            "reason": str(exc),
-                        }
-                    )
-                )
-            except (FetchError, UnsafeWorkbook) as exc:
-                failures += 1
-                print(
-                    json.dumps(
-                        {"source_id": sid, "url": target, "probe": "NOT_READ", "reason": str(exc)}
-                    )
-                )
-    return 0 if failures == 0 else 3
+                tally["read"] += 1
+            except PolicyBlocked as exc:  # the registry's deliberate gate (ERCOT): expected
+                tally["policy_blocked"] += 1
+                print(json.dumps(_record(sid, target, kind, "BLOCKED_BY_POLICY", str(exc))))
+            except (FetchError, UnsafeWorkbook) as exc:  # includes guard refusals: actionable
+                tally["not_read"] += 1
+                status = getattr(exc, "http_status", None)
+                print(json.dumps(_record(sid, target, kind, "NOT_READ", str(exc), status)))
+    print(json.dumps({"probe_summary": {**tally, "exit_policy": EXIT_POLICY}}))
+    return 0 if tally["not_read"] == 0 else 3
 
 
 if __name__ == "__main__":

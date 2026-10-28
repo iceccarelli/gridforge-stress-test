@@ -35,8 +35,20 @@ class FetchBlocked(FetchError):
     """Request refused before any network I/O (policy, credentials, source state)."""
 
 
+class PolicyBlocked(FetchBlocked):
+    """The registry deliberately gates this source (e.g. ERCOT until authorized access exists).
+
+    An expected restriction, unlike a guard refusal (unregistered host, bad redirect, non-public
+    address) or a failed read, which are actionable and stay plain `FetchBlocked` / `FetchFailed`.
+    """
+
+
 class FetchFailed(FetchError):
     """Network or content validation failed after the request was allowed."""
+
+    def __init__(self, message: str, *, http_status: int | None = None) -> None:
+        super().__init__(message)
+        self.http_status = http_status
 
 
 def redact(text: str, secrets: Mapping[str, str]) -> str:
@@ -165,6 +177,8 @@ def fetch_source(
     source = registry.get(source_id)
     if source is None:
         raise FetchBlocked(f"unknown source id {source_id!r}; arbitrary URLs are not accepted")
+    if source.live_fetch == "blocked_until_authorized":
+        raise PolicyBlocked(f"{source_id} is blocked until authorized access exists")
     if source.live_fetch != "enabled":
         raise FetchBlocked(f"live fetch for {source_id} is {source.live_fetch}")
     env_map = os.environ if env is None else env
@@ -224,9 +238,9 @@ def _follow(
             url = _join(url, location)
             continue
         if resp.status in (429, 500, 502, 503, 504):
-            raise _Retryable(f"HTTP {resp.status}")
+            raise _Retryable(f"HTTP {resp.status}", http_status=resp.status)
         if resp.status != 200:
-            raise FetchFailed(f"HTTP {resp.status}")
+            raise FetchFailed(f"HTTP {resp.status}", http_status=resp.status)
         ctype = resp.headers.get("content-type", "").split(";")[0].strip().lower()
         if (
             enforce_content_type
@@ -279,16 +293,21 @@ def probe_source(
     source_id: str,
     *,
     url: str | None = None,
-    allow_large: bool = False,
+    dataset: bool = False,
     resolver: Resolver = system_resolver,
     transport: Transport = default_transport,
     sources: Mapping[str, Source] | None = None,
 ) -> tuple[bytes, Manifest, Mapping[str, str]]:
-    """Read-only look at a registered source's own locator, to verify what the publisher says.
+    """Read-only look at one exact registered URL of a registered source.
 
     Same host/IP/redirect/size guards as `fetch_source`, but: works while live fetch is still
     `disabled_until_verified`, sends no credentials, does not enforce the (unverified) content-type list,
-    caps the body at PROBE_MAX_BYTES (or the source's own registry cap with allow_large, for one explicit file), makes one attempt, and returns headers. Gated sources stay blocked.
+    makes one attempt, and returns headers. Gated sources stay blocked.
+
+    Two kinds of target, never interchangeable:
+    - a publisher page (the locator or a `probe_urls` entry), capped at PROBE_MAX_BYTES;
+    - a dataset download (a `data_urls` entry), read only with `dataset=True` for explicit inspection and
+      capped at the source's own registry `max_bytes`.
     The result is evidence for a human or a verifier to read; it is never stored as a snapshot.
     """
     registry = sources if sources is not None else default_sources()
@@ -296,22 +315,38 @@ def probe_source(
     if source is None:
         raise FetchBlocked(f"unknown source id {source_id!r}; arbitrary URLs are not accepted")
     if source.live_fetch == "blocked_until_authorized":
-        raise FetchBlocked(f"{source_id} is blocked until authorized access exists")
-    if url is not None and url != source.locator and url not in source.probe_urls:
-        raise FetchBlocked("probe may only read the locator or a registered probe_urls entry")
+        raise PolicyBlocked(f"{source_id} is blocked until authorized access exists")
+    target = url or source.locator
+    if target in source.data_urls:
+        if not dataset:
+            raise FetchBlocked(
+                "registered dataset download: read only by explicit inspection (dataset=True), "
+                "never as a page probe"
+            )
+        cap = source.max_bytes
+    elif target == source.locator or target in source.probe_urls:
+        if dataset:
+            raise FetchBlocked("dataset inspection is limited to a registered data_urls entry")
+        cap = min(source.max_bytes, PROBE_MAX_BYTES)
+    else:
+        raise FetchBlocked(
+            "probe may only read the locator, a probe_urls page or a data_urls entry"
+        )
     deadline = time.monotonic() + TOTAL_TIMEOUT_S
     try:
         return _follow(
             source,
-            url or source.locator,
+            target,
             resolver,
             transport,
             deadline,
             {},
-            max_bytes=source.max_bytes if allow_large else min(source.max_bytes, PROBE_MAX_BYTES),
+            max_bytes=cap,
             enforce_content_type=False,
         )
     except FetchBlocked:
         raise
-    except (FetchFailed, OSError, http.client.HTTPException, ssl.SSLError) as exc:
+    except FetchFailed as exc:
+        raise FetchFailed(f"{source_id}: {exc}", http_status=exc.http_status) from exc
+    except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
         raise FetchFailed(f"{source_id}: {exc}") from exc

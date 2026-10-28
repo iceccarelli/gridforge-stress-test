@@ -89,8 +89,8 @@ def test_cli_probe_peek_prints_workbook_layout_for_registered_xlsx_only(monkeypa
     blob = make_xlsx()
     seen = []
 
-    def fake_probe(sid, url=None, allow_large=False, **kw):
-        seen.append((url, allow_large))
+    def fake_probe(sid, url=None, dataset=False, **kw):
+        seen.append((url, dataset))
         man = F.Manifest(  # type: ignore[attr-defined]
             source_id=sid,
             source_url=url or "",
@@ -109,25 +109,20 @@ def test_cli_probe_peek_prints_workbook_layout_for_registered_xlsx_only(monkeypa
     assert seen and all(u.endswith(".xlsx") and big for u, big in seen)
 
 
-def test_allow_large_uses_the_registry_cap_not_the_probe_cap():
+def test_dataset_inspection_uses_the_registry_cap_and_page_probes_use_the_probe_cap():
     reg = load_sources()
-    cap = reg["lbnl-queued-up"].max_bytes
+    src = reg["lbnl-queued-up"]
     got = {}
 
     def spy(ip, host, target, headers, max_bytes, deadline):
         got["cap"] = max_bytes
         return F.Response(200, {"content-type": "x"}, b"PK")
 
-    url = reg["lbnl-queued-up"].probe_urls[-1]
-    F.probe_source(
-        "lbnl-queued-up",
-        url=url,
-        allow_large=True,
-        resolver=lambda h: ["93.184.216.34"],
-        transport=spy,
-    )
-    assert got["cap"] == cap > F.PROBE_MAX_BYTES
-    F.probe_source("lbnl-queued-up", url=url, resolver=lambda h: ["93.184.216.34"], transport=spy)
+    pub = lambda h: ["93.184.216.34"]  # noqa: E731
+    url = src.data_urls[-1]
+    F.probe_source("lbnl-queued-up", url=url, dataset=True, resolver=pub, transport=spy)
+    assert got["cap"] == src.max_bytes > F.PROBE_MAX_BYTES
+    F.probe_source("lbnl-queued-up", resolver=pub, transport=spy)  # the locator page
     assert got["cap"] == F.PROBE_MAX_BYTES
 
 
@@ -291,7 +286,7 @@ def test_profile_lines_are_compact_and_cli_profile_wires_through(monkeypatch, ca
     lines = X.profile_lines(prof())
     assert lines[0].startswith("profile of 'Data'") and all("\n" not in x for x in lines)
 
-    def fake_probe(sid, url=None, allow_large=False, **kw):
+    def fake_probe(sid, url=None, dataset=False, **kw):
         man = F.Manifest(
             source_id=sid,
             source_url=url or "",
@@ -471,7 +466,7 @@ def test_cli_queue_stats_computes_durations_from_the_workbook_in_memory(monkeypa
 
     wb = lbnl_like_workbook()
 
-    def fake_probe(sid, url=None, allow_large=False, **kw):
+    def fake_probe(sid, url=None, dataset=False, **kw):
         man = F.Manifest(
             source_id=sid,
             source_url=url or "",
