@@ -26,6 +26,35 @@ MUST_NOT_CLAIM = (
 )
 
 
+def _survivorship(doc: dict[str, Any]) -> dict[str, Any] | None:
+    """Pool the fixture's mature entry-year cohorts into outcome shares; None if the fixture has none."""
+    block = doc.get("survivorship")
+    if not block:
+        return None
+    lo, hi = block["mature_cohort_years"]
+    keys = ("entered", "operational", "withdrawn", "active", "suspended", "unknown")
+    tot = {k: 0 for k in keys}
+    for yr in range(lo, hi + 1):
+        for k in keys:
+            tot[k] += block["cohorts_by_entry_year"][str(yr)][k]
+    resolved = tot["operational"] + tot["withdrawn"]
+    share_entered = round(tot["operational"] / tot["entered"], 3)
+    share_resolved = round(tot["operational"] / resolved, 3)
+    return {
+        "entry_years": [lo, hi],
+        **tot,
+        "share_operational_of_entered": share_entered,
+        "share_operational_of_resolved": share_resolved,
+        "statement": (
+            f"Survivorship: of {tot['entered']} requests that entered these queues in {lo}-{hi}, "
+            f"{tot['operational']} ({share_entered:.1%}) are operational and {tot['withdrawn']} withdrawn "
+            f"({tot['active'] + tot['suspended'] + tot['unknown']} unresolved); the durations above describe "
+            "only the operational ones."
+        ),
+        "note": block["cohort_note"],
+    }
+
+
 class BridgeError(ValueError):
     """The bridge cannot answer without guessing; the message says what is missing."""
 
@@ -143,6 +172,9 @@ def bridge(
         ),
         "The product's evidence class for this assumption is unchanged by this comparison.",
     ]
+    surv = _survivorship(doc)
+    if surv is not None:
+        statements.insert(2, surv["statement"])
     return {
         "schema": SCHEMA,
         "product_assumption": assumed,
@@ -158,6 +190,7 @@ def bridge(
             "provenance": doc["provenance"],
             "limits": doc["limits"],
         },
+        "survivorship": surv,
         "comparison": comparison,
         "applicability": {
             "site_country": country,

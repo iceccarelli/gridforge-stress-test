@@ -187,3 +187,14 @@ def test_context_labels_are_human_readable():
         == "all COD years"
     )
     assert "COD years 2018-2025" in " ".join(B.bridge(screen(), intake())["statements"])
+
+
+def test_bridge_states_pooled_mature_cohort_survivorship_from_the_fixture():
+    out = B.bridge(screen(), intake(), context_key="cod_2018_2025")
+    sv = out["survivorship"]
+    # hand sums of the 2010-2015 cohorts: 5633 entered, 1299 operational, 4153 withdrawn
+    assert (sv["entered"], sv["operational"], sv["withdrawn"]) == (5633, 1299, 4153)
+    assert sv["active"] + sv["suspended"] + sv["unknown"] == 181
+    assert sv["share_operational_of_entered"] == 0.231
+    assert sv["share_operational_of_resolved"] == 0.238
+    assert any("Survivorship" in x for x in out["statements"])

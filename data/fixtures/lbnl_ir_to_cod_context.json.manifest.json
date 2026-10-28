@@ -6,14 +6,14 @@
   "retrieved_at": "2026-10-28T05:43:04Z",
   "retrieval_status": "not_attempted",
   "response_status": 200,
-  "sha256": "702642d8721dc7f3d01ed48085677977020bbacfb4ce64947cd76f3588191a1d",
-  "byte_count": 2670,
+  "sha256": "b8c8137538c0666ceea28cfdb71891eb1279a74aa9c011f0b0efa59f54551536",
+  "byte_count": 4792,
   "record_count": null,
   "time_coverage": {
     "queue_data_through": "2025-12-31",
     "cod_years": "2018-2025 and all years"
   },
-  "upstream_release": "Queued Up 2026 Edition data file (sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6); statistics computed by the harness in GitHub Actions probe run 40639536058",
+  "upstream_release": "Queued Up 2026 Edition data file (sha256 794582d3281c6a305e9615fcfec3fae9dc85be2165216d33760b677e976a08b6); statistics computed by the harness in GitHub Actions probe run 40639536058; survivorship block from probe run 40642980669",
   "units": {
     "duration": "years"
   },

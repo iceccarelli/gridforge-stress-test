@@ -609,3 +609,17 @@ def test_the_context_fixture_pins_exactly_the_measured_numbers_and_is_attributed
         and "GridTracker" in man["attribution"]
     )
     assert "SOURCE-DERIVED" in " ".join(man["limitations"])
+
+
+def test_survivorship_block_pins_the_run_and_reconciles_each_cohort():
+    doc = json.loads((fixtures_dir() / "lbnl_ir_to_cod_context.json").read_text())
+    s = doc["survivorship"]
+    assert "40642980669" in s["measured_in"]
+    a = s["any_status_cod_2018_2025"]
+    assert (a["n"], a["p25"], a["median"], a["p75"]) == (1815, 3.086, 4.381, 5.944)
+    assert set(s["cohorts_by_entry_year"]) == {str(y) for y in range(2010, 2020)}
+    for yr, c in s["cohorts_by_entry_year"].items():
+        parts = c["operational"] + c["withdrawn"] + c["active"] + c["suspended"] + c["unknown"]
+        assert parts == c["entered"], yr
+    assert s["cohorts_by_entry_year"]["2012"]["unknown"] == 1
+    assert s["cohorts_by_entry_year"]["2019"]["entered"] == 2329
