@@ -466,8 +466,8 @@ def test_publisher_table_transcription_reconciles_with_its_own_sample_note():
 def test_cross_check_finding_our_operational_population_is_not_the_publishers_sample():
     """The publisher's sample (3,310) exceeds our ENTIRE operational-with-in-service-date population (3,145 before any
     exclusion), so its sample is not a subset of ours. 420 requests have an in-service date but are not 'operational'.
-    Hypothesis (UNVERIFIED): the publisher keys on the presence of both dates, not on status. Measured next with
-    population='has_in_service_date' per COD year."""
+    MEASURED in run 40640016068 (see test_any_status_population_reproduces_the_publishers_table below): the publisher
+    keys on the presence of both dates, not on status."""
     assert OUR_RUN2["operational_with_in_service_date"] < PUBLISHER_NOTE_SAMPLE
     non_operational_with_on_date = (
         MEASURED["active_rows_with_on_date"]
@@ -481,3 +481,105 @@ def test_cross_check_finding_our_operational_population_is_not_the_publishers_sa
     # the publisher's medians sit in a plausible band around ours (months -> years); this is context, NOT a validation
     pub_years = [PUBLISHER_IR_TO_COD[y][1] / 12 for y in range(2018, 2026)]
     assert min(pub_years) < OUR_RUN2["cod_2018_2025"]["median_years"] < max(pub_years)
+
+
+# --- run 40640016068: per-COD-year comparison with the publisher's sheet 37 -----------------------------------------
+# Our numbers: `probe lbnl-queued-up --queue-stats` (parser with non-positive capacity rows kept), in-service years
+# 2005-2025, (n, median_months) per year as printed in the log; months = years * 12 (i.e. 365.25 / 12 = 30.4375 days).
+OUR_ANY_STATUS = {
+    2005: (64, 17.626),
+    2006: (78, 21.832),
+    2007: (100, 24.838),
+    2008: (118, 21.487),
+    2009: (97, 31.08),
+    2010: (108, 33.446),
+    2011: (123, 34.497),
+    2012: (141, 31.474),
+    2013: (103, 35.023),
+    2014: (109, 44.452),
+    2015: (164, 37.815),
+    2016: (180, 43.992),
+    2017: (139, 39.688),
+    2018: (153, 42.71),
+    2019: (155, 46.324),
+    2020: (229, 46.062),
+    2021: (201, 49.971),
+    2022: (180, 55.162),
+    2023: (265, 55.754),
+    2024: (336, 62.752),
+    2025: (296, 60.83),
+}
+OUR_OPERATIONAL_ONLY = {
+    2005: (64, 17.626),
+    2006: (77, 22.472),
+    2007: (98, 24.838),
+    2008: (117, 21.52),
+    2009: (96, 30.752),
+    2010: (107, 33.38),
+    2011: (121, 34.497),
+    2012: (138, 31.261),
+    2013: (99, 32.821),
+    2014: (105, 47.113),
+    2015: (158, 37.815),
+    2016: (171, 41.988),
+    2017: (132, 39.441),
+    2018: (142, 42.973),
+    2019: (145, 46.324),
+    2020: (188, 44.895),
+    2021: (183, 49.971),
+    2022: (156, 57.971),
+    2023: (205, 56.214),
+    2024: (257, 61.372),
+    2025: (163, 65.281),
+}
+OUR_OPERATIONAL_ONLY_OVERALL_N = (
+    2_922  # printed header of the operational block (excluded_order=48)
+)
+MONTH_RATIO = 30.44 / 30.4375  # publisher's apparent days-per-month over ours
+
+
+def _diffs(ours):
+    dn = {y: ours[y][0] - PUBLISHER_IR_TO_COD[y][0] for y in ours}
+    dm = {y: ours[y][1] - PUBLISHER_IR_TO_COD[y][1] for y in ours}
+    return dn, dm
+
+
+def test_run3_transcriptions_cover_the_same_years_and_reconcile():
+    assert set(OUR_ANY_STATUS) == set(OUR_OPERATIONAL_ONLY) == set(PUBLISHER_IR_TO_COD)
+    assert sum(n for n, _ in OUR_OPERATIONAL_ONLY.values()) == OUR_OPERATIONAL_ONLY_OVERALL_N
+    assert sum(n for n, _ in OUR_ANY_STATUS.values()) == 3_339  # derived from the per-year lines
+
+
+def test_any_status_population_reproduces_the_publishers_table():
+    dn, dm = _diffs(OUR_ANY_STATUS)
+    assert all(v >= 0 for v in dn.values()), (
+        "our any-status sample is never smaller than the publisher's"
+    )
+    assert max(dn.values()) == 4 and sum(dn.values()) == 3_339 - PUBLISHER_NOTE_SAMPLE == 29
+    exact = sorted(y for y, v in dn.items() if v == 0)
+    assert exact == [2009, 2012, 2015, 2016, 2023]
+    assert max(abs(dm[y]) for y in exact) <= 0.005, (
+        "where the samples are equal the medians agree to 0.005 months"
+    )
+    for y in exact:  # the tiny residual is a constant ratio: the publisher converts days to months at ~30.44 days
+        assert abs(OUR_ANY_STATUS[y][1] / PUBLISHER_IR_TO_COD[y][1] - MONTH_RATIO) < 3e-5, y
+    assert round(max(abs(v) for v in dm.values()), 3) == 1.261  # 2014, where n differs by 1
+
+
+def test_operational_only_population_reproduces_the_publishers_table_far_worse_but_is_not_worse_in_every_year():
+    dn, dm = _diffs(OUR_OPERATIONAL_ONLY)
+    assert max(abs(v) for v in dn.values()) == 131 and dn[2025] == -131  # 163 vs 294
+    assert round(max(abs(v) for v in dm.values()), 3) == 4.456  # 2025
+    any_dn, _ = _diffs(OUR_ANY_STATUS)
+    assert sum(abs(v) for v in any_dn.values()) == 29 and sum(abs(v) for v in dn.values()) == 402
+    # NOT every year: operational-only is nearer in sample size in 2006-2008 and 2010 (by 1-2 requests), so LBNL's exact
+    # filter is neither population; from 2011 onward the any-status population is never worse.
+    nearer_op = sorted(y for y in dn if abs(dn[y]) < abs(any_dn[y]))
+    assert nearer_op == [2006, 2007, 2008, 2010]
+    assert all(abs(any_dn[y]) <= abs(dn[y]) for y in dn if y >= 2011)
+
+
+def test_the_comparable_population_option_is_the_closest_of_the_two_measured():
+    from gridforge_stress.queue import PUBLISHER_COMPARABLE_POPULATION
+
+    assert PUBLISHER_COMPARABLE_POPULATION == "has_in_service_date"

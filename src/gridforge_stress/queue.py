@@ -359,6 +359,13 @@ def percentile(sorted_values: list[float], q: float) -> float:
     return sorted_values[lo] + (h - lo) * (sorted_values[hi] - sorted_values[lo])
 
 
+#: LBNL's own IR-to-COD table (sheet '37. IR to COD - all') is reproduced closely by this population and far better
+#: than by `operational`: measured per COD year in probe run 40640016068 (sample sizes within 0-4 requests per year,
+#: total +29 of 3,310; medians identical to 0.005 months where the samples are equal). Not exact: the publisher's
+#: precise filter remains unverified. Use it when quoting a figure that must be comparable with LBNL's.
+PUBLISHER_COMPARABLE_POPULATION = "has_in_service_date"
+
+
 def duration_summary(
     records: Iterable[QueueRecord],
     *,
