@@ -14,6 +14,7 @@ Time-to-Power product. It is NOT a second implementation of the product.
 `uv sync --locked --all-groups` · `uv run --locked ruff check .` · `ruff format --check .` · `mypy src` ·
 `pytest` (offline; excludes `product` and `live`) · `pytest -m product` (needs `GRIDFORGE_PRODUCT_DIR`) ·
 `gridforge-stress doctor|sources list|scenarios list|validate-fixtures`.
+Live, read-only evidence (needs outbound network; in practice run via the `probe` workflow): `gridforge-stress probe <id>|--all [--peek-xlsx]`.
 
 ## Source-integrity rules (non-negotiable)
 1. A source is "verified" only if a publisher page was actually read; record `verification.status` honestly.
