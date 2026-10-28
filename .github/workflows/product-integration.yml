@@ -16,6 +16,14 @@ jobs:
   product:
     runs-on: ubuntu-latest
     steps:
+      - name: Require the product-repository secret
+        env:
+          PRODUCT_REPO_TOKEN: ${{ secrets.PRODUCT_REPO_TOKEN }}
+        run: |
+          if [ -z "$PRODUCT_REPO_TOKEN" ]; then
+            echo "::error::PRODUCT_REPO_TOKEN is not set. Add a read-only (contents) token for iceccarelli/GridForge-AI as a repository secret; this workflow cannot run without it."
+            exit 1
+          fi
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:

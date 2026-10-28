@@ -20,5 +20,11 @@ negative cases, and a labelled fixture + manifest if needed.
 Small, labelled (`synthetic_fixture` with `SYNTHETIC` in limitations, or `source_derived_fixture` with attribution
 and enough provenance to reconstruct). Never commit raw downloads. Regenerate the manifest checksum when edited.
 
+## Real-product tests on a runner
+`pytest -m product` needs the private GridForge-AI checkout. The opt-in `product-integration` workflow does that and
+requires a repository secret `PRODUCT_REPO_TOKEN` (read-only contents access to iceccarelli/GridForge-AI). Without
+the secret it stops with an explicit error; ordinary CI never needs it. Until the secret exists, the real-product
+tests run only where `GRIDFORGE_PRODUCT_DIR` points at a local checkout.
+
 ## Pull requests
 Describe evidence (commands run, results), list unverified behaviour, and keep CI offline.
