@@ -114,7 +114,13 @@ def tool_assess_evidence(args: Mapping[str, Any]) -> Any:
 
 def tool_parse_queue_rows(args: Mapping[str, Any]) -> Any:
     from .fixtures import QUEUE_MAP
-    from .queue import LBNL_2026_MAP, cohort_outcomes, duration_summary, parse_rows
+    from .queue import (
+        LBNL_2026_MAP,
+        capacity_summary,
+        cohort_outcomes,
+        duration_summary,
+        parse_rows,
+    )
 
     rows = args["rows"]
     if len(rows) > MAX_QUEUE_ROWS:
@@ -142,6 +148,8 @@ def tool_parse_queue_rows(args: Mapping[str, Any]) -> Any:
         except (KeyError, ValueError, TypeError) as exc:
             raise ToolError("as_of (YYYY-MM-DD) is required with entry_year") from exc
         out["cohort_outcomes"] = cohort_outcomes(recs, entry_year=args["entry_year"], as_of=as_of)
+    if args.get("capacity"):
+        out["capacity_summary"] = capacity_summary(recs)
     if args.get("durations"):
         out["duration_summary"] = duration_summary(recs, group_by=args.get("group_by"))
     return out
@@ -270,6 +278,10 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "entry_year": {"type": "integer", "minimum": 1980, "maximum": 2100},
                 "as_of": {"type": "string", "description": "YYYY-MM-DD; required with entry_year"},
                 "durations": {"type": "boolean"},
+                "capacity": {
+                    "type": "boolean",
+                    "description": "capacity summed once per (entity, id) request",
+                },
                 "group_by": {"type": "string"},
             },
             ["rows", "mapping"],

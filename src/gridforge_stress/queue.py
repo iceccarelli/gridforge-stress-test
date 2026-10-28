@@ -416,6 +416,48 @@ def duration_summary(
     return out
 
 
+def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
+    """Capacity as published in the capacity column, counted ONCE per (entity, id) request.
+
+    Measured on the real LBNL data (probe run 40638926321): 134 of the 135 repeated keys carry the same capacity on every
+    row (one request listed per location), and the non-first rows hold 26,458.6 MW. Summing rows naively would
+    double-count that. The first row of a repeated key is kept; later rows are counted in `double_counting_avoided_mw`.
+    Keys whose rows disagree on capacity are listed in `keys_with_differing_capacity` (their first row is used).
+    The unit of the capacity column is UNVERIFIED in the source documentation read so far.
+    """
+    first: dict[tuple[str, str], QueueRecord] = {}
+    differing: set[tuple[str, str]] = set()
+    naive = dedup = avoided = 0.0
+    avoided_rows = 0
+    by_status_dedup: dict[str, float] = {}
+    by_status_naive: dict[str, float] = {}
+    for r in records:
+        naive += r.capacity_mw
+        by_status_naive[r.status] = by_status_naive.get(r.status, 0.0) + r.capacity_mw
+        if FLAG_DUP_KEY in r.flags:
+            key = (r.entity or "", r.project_id)
+            if key in first:
+                avoided += r.capacity_mw
+                avoided_rows += 1
+                if r.capacity_mw != first[key].capacity_mw:
+                    differing.add(key)
+                continue
+            first[key] = r
+        dedup += r.capacity_mw
+        by_status_dedup[r.status] = by_status_dedup.get(r.status, 0.0) + r.capacity_mw
+    return {
+        "label": "capacity as published in the capacity column (unit UNVERIFIED, presumed MW), counted once per "
+        "(entity, id) request; not available capacity, not a connection probability",
+        "naive_row_sum": round(naive, 3),
+        "deduplicated_sum": round(dedup, 3),
+        "double_counting_avoided_mw": round(avoided, 3),
+        "rows_not_counted": avoided_rows,
+        "keys_with_differing_capacity": len(differing),
+        "by_status_deduplicated": {k: round(v, 3) for k, v in sorted(by_status_dedup.items())},
+        "by_status_naive": {k: round(v, 3) for k, v in sorted(by_status_naive.items())},
+    }
+
+
 #: Built ONLY from the observed 2026 workbook: sheet '03. Complete Queue Data' header row, the codebook text
 #: "q_status ... One of: active, withdrawn, suspended, or operational", and the measured distinct q_status values
 #: (those four PLUS 'unknown': 10 rows, not listed in the codebook). `mw_1` pairs with `type_1` in every observed row;

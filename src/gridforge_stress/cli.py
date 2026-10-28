@@ -133,6 +133,7 @@ def _probe(
                     from .queue import (
                         LBNL_2026_MAP,
                         LBNL_2026_PROFILE,
+                        capacity_summary,
                         duration_summary,
                         parse_rows,
                     )
@@ -166,6 +167,9 @@ def _probe(
                                 group_by="region",
                             )
                             print(json.dumps(res, sort_keys=True))
+                        print(
+                            json.dumps({"capacity_summary": capacity_summary(recs)}, sort_keys=True)
+                        )
                     if show_sheets:
                         for name in show_sheets:
                             print("\n".join(show_sheet_lines(body, name)))

@@ -326,3 +326,44 @@ def test_duration_summary_counts_a_repeated_key_once_and_filters_by_cod_year_and
     late = duration_summary(recs, cod_year_min=2018, cod_year_max=2025)
     assert late["overall"]["n"] == 2 and late["cod_year_range"] == [2018, 2025]
     assert duration_summary([])["overall"] == {"n": 0}
+
+
+def test_capacity_summary_counts_each_request_once_and_discloses_the_double_count():
+    from dataclasses import replace
+
+    from gridforge_stress.queue import capacity_summary
+
+    m = replace(QUEUE_MAP, entity="ent")
+    rows = [
+        {**base(proj="a", stat="Active", mw="100"), "ent": "E"},
+        {**base(proj="a", stat="Active", mw="100"), "ent": "E"},  # same request, second location
+        {**base(proj="a", stat="Active", mw="100"), "ent": "E"},  # third location
+        {**base(proj="b", stat="Active", mw="50"), "ent": "E"},
+        {**base(proj="b", stat="Active", mw="30"), "ent": "E"},  # same key, capacity disagrees
+        {**base(proj="c", stat="Operational", mw="7", in_service="2021-01-01"), "ent": "E"},
+        {
+            **base(proj="c", stat="Operational", mw="7", in_service="2021-01-01"),
+            "ent": "F",
+        },  # other entity: distinct
+    ]
+    recs, _ = parse_rows(rows, m)
+    out = capacity_summary(recs)
+    assert out["naive_row_sum"] == 100 * 3 + 50 + 30 + 7 + 7  # 394
+    assert out["deduplicated_sum"] == 100 + 50 + 7 + 7  # 164: first row of each repeated key only
+    assert out["double_counting_avoided_mw"] == 100 + 100 + 30  # 230 = 394 - 164
+    assert out["naive_row_sum"] - out["deduplicated_sum"] == out["double_counting_avoided_mw"]
+    assert out["rows_not_counted"] == 3 and out["keys_with_differing_capacity"] == 1
+    assert out["by_status_deduplicated"] == {"active": 150.0, "operational": 14.0}
+    assert "unit UNVERIFIED" in out["label"] and "not a connection probability" in out["label"]
+
+
+def test_capacity_summary_without_repeats_equals_the_naive_sum():
+    from gridforge_stress.queue import capacity_summary
+
+    recs, _ = parse_rows([base(proj="x", mw="5"), base(proj="y", mw="6")], QUEUE_MAP)
+    out = capacity_summary(recs)
+    assert (
+        out["naive_row_sum"] == out["deduplicated_sum"] == 11.0
+        and out["double_counting_avoided_mw"] == 0.0
+    )
+    assert capacity_summary([])["naive_row_sum"] == 0.0

@@ -106,6 +106,11 @@ MEASURED = {
     "repeated_keys_county_differs": 134,
     "repeated_keys_state_differs": 33,
     "repeated_keys_on_date_differs": 79,
+    # run 40638926321 (dup_value_col=mw_1):
+    "repeated_keys_mw_1_identical": 134,
+    "repeated_keys_mw_1_differing": 1,
+    "mw_1_sum_all_rows_in_repeated_keys": 53_917.2,
+    "mw_1_sum_on_non_first_rows": 26_458.6,
 }
 
 
@@ -320,3 +325,30 @@ def test_non_positive_capacity_rows_are_the_only_capacity_rejections_and_are_cou
     base = {"q_id": "Q1", "entity": "APS", "q_status": "active", "q_date": "43511"}
     for v, rejected in (("0", True), ("-1", True), ("0.5", False)):
         assert (parse_rows([{**base, "mw_1": v}], LBNL_2026_MAP)[0] == []) is rejected
+
+
+def test_measured_capacity_repeat_is_consistent_and_motivates_counting_requests_once():
+    m = MEASURED
+    assert (
+        m["repeated_keys_mw_1_identical"] + m["repeated_keys_mw_1_differing"]
+        == m["repeated_entity_id_keys"]
+    )
+    first_rows = m["mw_1_sum_all_rows_in_repeated_keys"] - m["mw_1_sum_on_non_first_rows"]
+    assert first_rows == pytest.approx(27_458.6)
+    # 134 identical pairs => the non-first rows mirror the first rows, apart from the one differing key (1,000 MW)
+    assert first_rows - m["mw_1_sum_on_non_first_rows"] == pytest.approx(1_000.0)
+    share = m["mw_1_sum_on_non_first_rows"] / m["mw_1_sum_all_rows_in_repeated_keys"]
+    assert 0.49 < share < 0.50, (
+        "about half of the capacity sitting in repeated keys is on rows that must not be re-counted"
+    )
+
+
+def test_capacity_summary_reproduces_the_measured_double_count_shape_on_the_observed_sample_rows():
+    from gridforge_stress.queue import capacity_summary
+
+    rows = json.loads((fixtures_dir() / "lbnl_observed_sample.json").read_text())["rows"]
+    recs, _ = parse_rows(rows, LBNL_2026_MAP)
+    out = capacity_summary(recs)
+    assert (
+        out["naive_row_sum"] == out["deduplicated_sum"] == 20 + 24 + 900 + 300 + 700 + 60
+    )  # no repeats in these rows

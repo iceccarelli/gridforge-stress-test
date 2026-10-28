@@ -492,3 +492,8 @@ def test_cli_queue_stats_computes_durations_from_the_workbook_in_memory(monkeypa
         [(5 * 365 + 1) / 365.25, (8 * 365 + 2) / 365.25]
     )  # 2015-01-01 -> 2020-01-01 and -> 2023-01-01
     assert overall["overall"]["median_years"] == pytest.approx(sum(expected) / 2, abs=1e-3)
+    cap = _json.loads(out[4])["capacity_summary"]
+    assert (
+        cap["naive_row_sum"] == cap["deduplicated_sum"] == 30.0
+        and cap["double_counting_avoided_mw"] == 0.0
+    )

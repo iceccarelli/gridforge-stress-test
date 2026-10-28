@@ -364,3 +364,18 @@ def test_real_subprocess_speaks_clean_json_rpc_over_stdio():
     assert len(parsed[1]["result"]["tools"]) == len(M.TOOLS)
     assert len(json.loads(parsed[2]["result"]["content"][0]["text"])) == 9
     assert json.loads(parsed[3]["result"]["content"][0]["text"])["level"] == "context_only"
+
+
+def test_parse_queue_rows_capacity_option_counts_requests_once(server):
+    base = {"entity": "APS", "q_status": "active", "q_date": "43511", "mw_1": "100"}
+    rows = [
+        {**base, "q_id": "Q1", "county": "A"},
+        {**base, "q_id": "Q1", "county": "B"},
+        {**base, "q_id": "Q2"},
+    ]
+    out = payload(
+        call(server, "parse_queue_rows", {"rows": rows, "mapping": "lbnl_2026", "capacity": True})
+    )
+    cap = out["capacity_summary"]
+    assert cap["naive_row_sum"] == 300.0 and cap["deduplicated_sum"] == 200.0
+    assert cap["double_counting_avoided_mw"] == 100.0 and out["flag_counts"]["duplicate_key"] == 2
