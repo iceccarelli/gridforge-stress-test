@@ -337,6 +337,40 @@ def evaluate_queue_context(
         "a region request changes the context block and nothing else in the comparison",
         bad,
     )
+
+    # The paid document is what a customer reads, so the same statistic is checked in its text, not only in the JSON.
+    pooled = doc["contexts"]["cod_2018_2025"]
+    heading = "Grid wait: what has been observed elsewhere (context only)"
+    rendered = api("screen", {"intake": intake, "format": "md"}, report_date=report_date)
+    bad = []
+    if not rendered.get("ok"):
+        bad.append(f"the Density Screen document was refused: {rendered.get('message')}")
+    else:
+        text = str(rendered["result"].get("document", ""))
+        expected = [
+            f"median of {round(pooled['median'] * 12)} months",
+            f"middle half {round(pooled['p25'] * 12)}-{round(pooled['p75'] * 12)} months",
+            f"across {pooled['n']} projects",
+            "Context only: this is not a connection time for a load or a data centre",
+            "CC BY 4.0",
+        ]
+        if want is not None:
+            expected.append(
+                f"Only {want['share_operational_of_entered']:.0%} of the {want['entered']} requests"
+            )
+        for needle in expected:
+            if needle not in text:
+                bad.append(f"the document does not say: {needle!r}")
+        if heading not in text:
+            bad.append("the document has no grid-wait context section")
+        elif 0 <= text.find("Recommended next step") < text.index(heading):
+            bad.append("the context section comes after the next step instead of before it")
+    _check(
+        res,
+        "context.document_matches",
+        "the Density Screen document states the same measured figures and the same limits",
+        bad,
+    )
     return res
 
 

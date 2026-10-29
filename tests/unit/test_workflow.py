@@ -284,10 +284,42 @@ def with_context(**over) -> dict:
     return out
 
 
-def regional_api(compare_out: dict, *, observed=None, change=None):
+def screen_document(
+    *,
+    months=(53, 37, 70),
+    n=1439,
+    share="23%",
+    entered=5633,
+    heading=True,
+    disclaimer=True,
+    order_ok=True,
+) -> str:
+    median, p25, p75 = months
+    section = (
+        "## 5. Grid wait: what has been observed elsewhere (context only)\n\n"
+        f"- US requests took a median of {median} months from request to operation (middle half {p25}-{p75} months), across {n} projects. "
+        "Source: Lawrence Berkeley National Laboratory, Queued Up 2026 edition, CC BY 4.0.\n"
+        f"- Only {share} of the {entered} requests that entered a queue in 2010-2015 reached operation.\n"
+        + (
+            "\n> Context only: this is not a connection time for a load or a data centre.\n"
+            if disclaimer
+            else ""
+        )
+    )
+    nxt = "## 6. Recommended next step\n\ntext\n"
+    body = (section + nxt) if order_ok else (nxt + section)
+    if not heading:
+        body = body.replace("Grid wait: what has been observed elsewhere (context only)", "Other")
+    return "# Density Screen\n\n" + body
+
+
+def regional_api(compare_out: dict, *, observed=None, change=None, document=None):
     """A product that answers a region request with PJM's measured figures; `change` lets a test make it move something else."""
 
     def api(route, body, report_date="2026-10-27"):
+        if route == "screen":
+            doc = document if document is not None else screen_document()
+            return {"ok": True, "result": {"format": "md", "document": doc}}
         out = copy.deepcopy(compare_out)
         out["grid_queue_context"]["observed"] = (
             observed or queue_context(years=(3.243, 4.893, 6.45), n=427)["observed"]
@@ -308,11 +340,12 @@ def test_a_product_without_the_context_block_is_not_judged_for_it():
     assert W.evaluate_queue_context(INTAKE, payload(), regional_api(payload()), "2026-10-27") == []
 
 
-def test_a_faithful_copy_of_the_measurement_passes_all_three_checks():
+def test_a_faithful_copy_of_the_measurement_passes_all_four_checks():
     assert judged(with_context()) == {
         "context.matches_independent_measurement": "PASS",
         "context.limits_are_stated": "PASS",
         "context.region_moves_nothing_else": "PASS",
+        "context.document_matches": "PASS",
     }
 
 
@@ -408,3 +441,33 @@ def test_the_expected_values_come_from_the_harness_fixture_not_from_the_product(
         5.844,
     )
     assert doc["by_region_cod_2018_2025"]["PJM"]["n"] == 427
+
+
+DOCUMENT_CASES = {
+    "a wrong median in the text": dict(months=(40, 37, 70)),
+    "a wrong middle half": dict(months=(53, 30, 70)),
+    "a wrong sample size": dict(n=1000),
+    "a wrong survivorship share": dict(share="90%"),
+    "a wrong cohort size": dict(entered=100),
+    "no disclaimer": dict(disclaimer=False),
+    "no section heading": dict(heading=False),
+    "the section after the next step": dict(order_ok=False),
+}
+
+
+@pytest.mark.parametrize("name", sorted(DOCUMENT_CASES))
+def test_the_oracle_fails_a_document_that_misstates_the_measurement(name):
+    out = with_context()
+    result = judged(out, regional_api(out, document=screen_document(**DOCUMENT_CASES[name])))
+    assert result["context.document_matches"] == "FAIL", (name, result)
+
+
+def test_a_refused_document_is_a_failure():
+    out = with_context()
+
+    def refuse_doc(route, body, report_date="2026-10-27"):
+        if route == "screen":
+            return {"ok": False, "message": "refused"}
+        return regional_api(out)(route, body, report_date)
+
+    assert judged(out, refuse_doc)["context.document_matches"] == "FAIL"
