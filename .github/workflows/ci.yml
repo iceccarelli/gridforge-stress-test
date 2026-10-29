@@ -44,6 +44,20 @@ jobs:
           for need in ("_data/configs/sources.json", "_data/schemas/source.schema.json"):
               assert any(n.endswith(need) for n in names), need
           PY
+      - name: twine check (the metadata renders on PyPI)
+        # Deliberately not pinned: twine only reads the built files (no credentials), and a pinned release rejects the metadata version the
+        # current hatchling writes ('2.5 is not a valid metadata version' with twine 6.1.0).
+        run: uvx twine check --strict dist/*
+      - name: Install the wheel into a clean environment, away from the checkout, and run it offline
+        run: |
+          uv venv "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv/bin/python" dist/*.whl
+          cd "$RUNNER_TEMP"
+          V="$RUNNER_TEMP/venv/bin"
+          "$V/python" -c "import gridforge_stress, pathlib; p = pathlib.Path(gridforge_stress.__file__).resolve(); assert 'site-packages' in p.parts, p; print('installed from', p)"
+          "$V/gridforge-stress" sources list
+          "$V/gridforge-stress" scenarios list
+          "$V/gridforge-stress" validate-fixtures
 
   dependency-audit:
     # Fails on known vulnerabilities in the locked set; the result is actionable, not cosmetic.
