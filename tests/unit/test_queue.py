@@ -352,7 +352,11 @@ def test_capacity_summary_counts_each_request_once_and_discloses_the_double_coun
     assert out["naive_row_sum"] - out["deduplicated_sum"] == out["double_counting_avoided_mw"]
     assert out["rows_not_counted"] == 3 and out["keys_with_differing_capacity"] == 1
     assert out["by_status_deduplicated"] == {"active": 150.0, "operational": 14.0}
-    assert "unit UNVERIFIED" in out["label"] and "not a connection probability" in out["label"]
+    assert (
+        "unit MW per the workbook codebook" in out["label"]
+        and "mw_2/mw_3 not summed" in out["label"]
+    )
+    assert "not a connection probability" in out["label"]
 
 
 def test_capacity_summary_breaks_active_and_other_capacity_down_by_region_once_per_request():
