@@ -6,7 +6,7 @@ more than its evidence supports.
 
 **Status:** foundation with first live evidence. Publisher pages for 7 of 9 sources have been read via the `probe` workflow;
 no live dataset has been downloaded or parsed yet and live fetch is disabled everywhere (see [docs/data-sources.md](docs/data-sources.md)).
-No licence file is present; the owner has not chosen one.
+Licensed under the Apache License 2.0 (see [LICENSE](LICENSE)). Fixtures derived from third-party data keep that data's own licence and attribution (for example LBNL *Queued Up*, CC BY 4.0), which the fixture manifests record.
 
 ## Fast start
 ```bash

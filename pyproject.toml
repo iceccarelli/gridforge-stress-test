@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.27"]  # 1.27 for PEP 639 licence metadata
 build-backend = "hatchling.build"
 
 [project]
@@ -7,6 +7,9 @@ name = "gridforge-stress"
 version = "0.1.0"
 description = "Independent source-integrity and adversarial acceptance harness for GridForge Time-to-Power"
 readme = "README.md"
+# Licence chosen by the owner on 2026-10-29: Apache-2.0 (see LICENSE). Do not change it without the owner.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.14"
 dependencies = ["jsonschema>=4.23,<5"]
 

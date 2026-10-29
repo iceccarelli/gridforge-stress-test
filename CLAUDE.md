@@ -42,11 +42,11 @@ Product is `../GridForge-AI` (override with `GRIDFORGE_PRODUCT_DIR`). Call only 
 
 ## Release
 Publishing to PyPI is `.github/workflows/publish-pypi.yml`: manual, Trusted Publishing (no token anywhere), refuses without a `LICENSE` file
-(the owner chooses the licence; never choose one for them), a typed version and a version not already on PyPI. CI installs the built wheel into a
+(the owner chose Apache-2.0), a typed version and a version not already on PyPI. CI installs the built wheel into a
 clean environment and runs it offline before anything is published.
 
 ## Branch safety
-No force-push, reset --hard, clean, or stash. Do not merge PRs. Do not choose a licence for the owner.
+No force-push, reset --hard, clean, or stash. Do not merge PRs. The licence is the owner's: Apache-2.0 for this harness (chosen 2026-10-29, the engine is FSL-1.1-ALv2); never change either without them.
 
 ## Engineering loop
 Inspect -> change -> run the exact documented commands -> fix failures (never suppress) -> review `git diff`

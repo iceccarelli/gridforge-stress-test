@@ -38,13 +38,21 @@ def test_publishing_refuses_without_a_licence_and_a_typed_version_and_a_new_vers
     assert not any("inputs.confirm" in block for block in run_blocks)
 
 
-def test_no_licence_is_claimed_without_a_licence_file():
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    claims = "license" in project or any(
-        c.startswith("License ::") for c in project.get("classifiers", [])
+#: sha256 of the official Apache License 2.0 text from https://www.apache.org/licenses/LICENSE-2.0.txt (11,358 bytes).
+APACHE_2_0_SHA256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
+
+def test_the_licence_is_the_official_apache_2_0_text_and_the_metadata_says_so():
+    import hashlib
+
+    assert hashlib.sha256((ROOT / "LICENSE").read_bytes()).hexdigest() == APACHE_2_0_SHA256, (
+        "LICENSE differs from the official Apache-2.0 text"
     )
-    has_file = any((ROOT / f).exists() for f in ("LICENSE", "LICENSE.txt", "LICENSE.md"))
-    assert not claims or has_file
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    assert project["license"] == "Apache-2.0" and project["license-files"] == ["LICENSE"]
+    assert not any(c.startswith("License ::") for c in project.get("classifiers", [])), (
+        "PEP 639: no License classifier with an expression"
+    )
 
 
 def test_ci_runs_the_installed_wheel_not_only_the_source_tree():
