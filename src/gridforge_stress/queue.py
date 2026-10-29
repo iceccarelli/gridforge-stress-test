@@ -465,7 +465,8 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
     row (one request listed per location), and the non-first rows hold 26,458.6 MW. Summing rows naively would
     double-count that. The first row of a repeated key is kept; later rows are counted in `double_counting_avoided_mw`.
     Keys whose rows disagree on capacity are listed in `keys_with_differing_capacity` (their first row is used).
-    The unit of the capacity column is UNVERIFIED in the source documentation read so far.
+    The unit of mw_1 is MW: the workbook's own codebook defines it as 'capacity of type 1 (MW)' (probe run 40932230568). mw_2/mw_3
+    (hybrid / co-located components) are not summed here; their notes were truncated in the probe output and remain unread.
     """
     first: dict[tuple[str, str], QueueRecord] = {}
     differing: set[tuple[str, str]] = set()
@@ -473,6 +474,7 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
     avoided_rows = 0
     by_status_dedup: dict[str, float] = {}
     by_status_naive: dict[str, float] = {}
+    by_region_status: dict[str, dict[str, float]] = {}
     nonpositive = 0
     for r in records:
         if FLAG_NONPOS_CAP in r.flags:
@@ -491,8 +493,11 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
             first[key] = r
         dedup += r.capacity_mw
         by_status_dedup[r.status] = by_status_dedup.get(r.status, 0.0) + r.capacity_mw
+        region = str(r.raw.get("region") or "(blank)")
+        cell = by_region_status.setdefault(region, {})
+        cell[r.status] = cell.get(r.status, 0.0) + r.capacity_mw
     return {
-        "label": "capacity as published in the capacity column (unit UNVERIFIED, presumed MW), counted once per "
+        "label": "capacity as published in the mw_1 column (unit MW per the workbook codebook; mw_2/mw_3 not summed), counted once per "
         "(entity, id) request; not available capacity, not a connection probability",
         "naive_row_sum": round(naive, 3),
         "deduplicated_sum": round(dedup, 3),
@@ -502,6 +507,10 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
         "keys_with_differing_capacity": len(differing),
         "by_status_deduplicated": {k: round(v, 3) for k, v in sorted(by_status_dedup.items())},
         "by_status_naive": {k: round(v, 3) for k, v in sorted(by_status_naive.items())},
+        "by_region_status_deduplicated": {
+            region: {k: round(v, 3) for k, v in sorted(cell.items())}
+            for region, cell in sorted(by_region_status.items())
+        },
     }
 
 

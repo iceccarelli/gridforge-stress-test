@@ -116,6 +116,35 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
         "current_site_peak_MW": 7.4,
         "firm_capacity_MVA": 14,
     }
+    hall_response = {
+        "supplier": "Synthetic Supplier A",
+        "received_on": "2026-10-01",
+        "valid_until": "2027-01-01",
+        "currency": "EUR",
+        "values": {
+            "capex_eur": 1200000,
+            "lead_time_weeks": 30,
+            "install_weeks": 8,
+            "outage_hours_per_unit": 6,
+            "validity_days": 90,
+        },
+        "compliance": {"E-10": "YES", "E-11": "YES", "C-01": "YES"},
+        "text": {"note": "synthetic"},
+    }
+    deploy_response = {
+        "supplier": "Synthetic Supplier B",
+        "received_on": "2026-10-01",
+        "valid_until": "2027-01-01",
+        "currency": "EUR",
+        "values": {
+            "capex_eur": 25000000,
+            "lead_time_weeks": 44,
+            "install_weeks": 12,
+            "warranted_availability": 0.98,
+            "validity_days": 90,
+        },
+        "compliance": {},
+    }
     return [
         # every leaf of the intake, straight into the shared loader
         {
@@ -145,6 +174,24 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
         ),
         plan("spec", "/v1/spec", {"intake": intake, "scenario": "full_dlc_btm"}, ["intake"]),
         plan("spec_list", "/v1/spec", {"intake": intake, "list": True}, ["intake"]),
+        plan(
+            "bids",
+            "/v1/bids",
+            {"intake": intake, "scenario": "full_dlc_btm", "responses": [hall_response]},
+            ["intake"],
+        ),
+        plan(
+            "power_deploy_spec",
+            "/v1/power/deploy/spec",
+            {**deploy, "project": "Synthetic", "format": "json"},
+            [],
+        ),
+        plan(
+            "power_deploy_bids",
+            "/v1/power/deploy/bids",
+            {**deploy, "responses": [deploy_response]},
+            [],
+        ),
         plan("portfolio", "/v1/portfolio", {"intakes": [intake, intake]}, ["intakes"]),
         plan(
             "power_assess", "/v1/power/assess", {"intake": intake, "target_racks": 40}, ["intake"]

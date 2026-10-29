@@ -115,9 +115,11 @@ def test_lbnl_registry_states_what_was_and_was_not_read():
     lbnl = load_sources()["lbnl-queued-up"]
     basis = lbnl.raw["verification"]["basis"]
     assert "403" in basis and "NOT read" in basis
+    assert "capacity of type 1 (MW)" in lbnl.raw["units"]
     assert any(
-        "UNVERIFIED" in x and "codebook" in x and "units" in x for x in lbnl.raw["limitations"]
-    )
+        "UNVERIFIED" in x and "codebook" in x and "mw_2 and mw_3" in x
+        for x in lbnl.raw["limitations"]
+    )  # the unit is settled; what the hybrid-component notes say is still unread
     assert (
         "CC BY 4.0" in lbnl.raw["license_attribution"]
         and "GridTracker" in lbnl.raw["license_attribution"]

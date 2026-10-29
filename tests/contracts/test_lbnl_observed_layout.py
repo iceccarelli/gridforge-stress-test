@@ -195,7 +195,10 @@ def test_registry_states_the_observed_layout_and_keeps_the_rest_unverified():
     lbnl = load_sources()["lbnl-queued-up"]
     text = " ".join(lbnl.raw["limitations"])
     assert OBSERVED_DATA_SHEET in text and "04. Data Codebook" in text
-    assert "UNVERIFIED" in text, "units and unread codebook rows must stay unverified"
+    assert "capacity of type 1/2/3 (MW)" in text, (
+        "the unit comes from the codebook, read in a probe run"
+    )
+    assert "UNVERIFIED" in text, "the truncated mw_2/mw_3 notes must stay marked unread"
     assert lbnl.live_fetch == "disabled_until_verified"
 
 

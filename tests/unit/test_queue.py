@@ -352,7 +352,47 @@ def test_capacity_summary_counts_each_request_once_and_discloses_the_double_coun
     assert out["naive_row_sum"] - out["deduplicated_sum"] == out["double_counting_avoided_mw"]
     assert out["rows_not_counted"] == 3 and out["keys_with_differing_capacity"] == 1
     assert out["by_status_deduplicated"] == {"active": 150.0, "operational": 14.0}
-    assert "unit UNVERIFIED" in out["label"] and "not a connection probability" in out["label"]
+    assert (
+        "unit MW per the workbook codebook" in out["label"]
+        and "mw_2/mw_3 not summed" in out["label"]
+    )
+    assert "not a connection probability" in out["label"]
+
+
+def test_capacity_summary_breaks_active_and_other_capacity_down_by_region_once_per_request():
+    from dataclasses import replace
+
+    from gridforge_stress.queue import capacity_summary
+
+    m = replace(QUEUE_MAP, entity="ent")
+    rows = [
+        {**base(proj="a", stat="Active", mw="100"), "ent": "E", "region": "PJM"},
+        {
+            **base(proj="a", stat="Active", mw="100"),
+            "ent": "E",
+            "region": "PJM",
+        },  # same request again
+        {**base(proj="b", stat="Active", mw="40"), "ent": "E", "region": "ERCOT"},
+        {
+            **base(proj="c", stat="Withdrawn", mw="9", withdrawn="2021-01-01"),
+            "ent": "E",
+            "region": "PJM",
+        },
+        {**base(proj="d", stat="Active", mw="5"), "ent": "E"},  # no region in the source row
+    ]
+    recs, _ = parse_rows(rows, m)
+    by_region = capacity_summary(recs)["by_region_status_deduplicated"]
+    assert by_region["PJM"] == {
+        "active": 100.0,
+        "withdrawn": 9.0,
+    }  # the repeated request is counted once
+    assert by_region["ERCOT"] == {"active": 40.0}
+    assert by_region["(blank)"] == {"active": 5.0}
+    # the regional cells add up to the same deduplicated total as the overall figure
+    overall = capacity_summary(recs)
+    assert (
+        sum(v for cell in by_region.values() for v in cell.values()) == overall["deduplicated_sum"]
+    )
 
 
 def test_capacity_summary_without_repeats_equals_the_naive_sum():

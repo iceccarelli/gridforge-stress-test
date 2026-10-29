@@ -207,7 +207,7 @@ def test_the_default_plans_cover_every_route_with_a_synthetic_base():
     routes = {p["route"] for p in plans}
     assert routes >= {
         "loader", "/v1/screen", "/v1/compare", "/v1/study", "/v1/diff", "/v1/deck", "/v1/proposal", "/v1/spec",
-        "/v1/portfolio", "/v1/power/assess", "/v1/power/deploy/assess", "/v1/qualify", "/v1/estimate",
+        "/v1/portfolio", "/v1/bids", "/v1/power/deploy/spec", "/v1/power/deploy/bids", "/v1/power/assess", "/v1/power/deploy/assess", "/v1/qualify", "/v1/estimate",
     }  # fmt: skip
     assert len({p["name"] for p in plans}) == len(
         plans
