@@ -293,6 +293,24 @@ def test_an_unknown_evidence_class_is_refused_by_field_name(intake):
     assert "'E9'" in out["message"]
 
 
+def test_compare_carries_the_plausibility_findings_screen_reports_for_the_same_intake(intake):
+    """Fixed in the product (PR #90): for an IT load far above the supply ceiling /v1/screen warned and /v1/compare said nothing. The
+    expectation is read from /v1/screen for the same intake, not written here, so it does not depend on the finding's wording."""
+    odd = mutated(intake, lambda x: x["grid"].__setitem__("current_it_load_MW", 99))
+    screen = call("screen", {"intake": odd})
+    assert screen["ok"], screen
+    findings = [w for w in screen["result"]["intake"]["warnings"] if "firm supply ceiling" in w]
+    assert findings, "precondition: screen reports a plausibility finding for this intake"
+    compare_out = compare(odd)
+    assert compare_out["ok"], compare_out
+    for finding in findings:
+        assert finding in compare_out["result"]["caveats"]
+
+
+def test_a_sound_intake_gains_no_plausibility_caveat(intake, baseline):
+    assert not [c for c in baseline["caveats"] if "firm supply ceiling" in c]
+
+
 # --- inputs that cannot describe a working site ------------------------------------------------------------------
 
 

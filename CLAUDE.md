@@ -17,6 +17,7 @@ Time-to-Power product. It is NOT a second implementation of the product.
 `gridforge-stress bridge <intake.json>` sets the product's grid-wait assumption beside observed queue history (context only).
 `gridforge-stress workflow <intake.json> [-o record.json]` runs the end-to-end journey on the real product and judges it (PASS/FAIL/BLOCKED/UNCHECKED; exit 0 only if all pass).
 `gridforge-stress mcp` serves the harness as an MCP server over stdio (see README; `.mcp.json`).
+`gridforge-stress fuzz [--sample N] [--seed S]` drives every product route with hostile values (wrong types, non-finite/huge numbers, deep nesting); exit 1 if a request escapes as a server fault or is slow, 2 if the product is unavailable. Also `pytest -m product`.
 Live, read-only evidence (needs outbound network; in practice run via the `probe` workflow): `gridforge-stress probe <id>|--all [--peek-xlsx]`
 (exit 0 = read or policy-blocked, 3 = a target was NOT_READ; `data_urls` are dataset downloads, inspected only on explicit request).
 `GRIDFORGE_PRODUCT_DIR`, when set, is authoritative: an invalid value fails (no fallback) and the product tests fail rather than skip.

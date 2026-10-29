@@ -37,6 +37,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     wf.add_argument("intake", help="path to a GridForge intake JSON")
     wf.add_argument("-o", "--output", default=None, help="write the decision record JSON here")
+    fz = sub.add_parser(
+        "fuzz",
+        help="hostile-input fuzz of every product route (needs the product checkout); exit 1 if anything escapes as a server fault or is slow",
+    )
+    fz.add_argument(
+        "--sample",
+        type=int,
+        default=12,
+        help="intake paths sampled per route (the loader is always fuzzed exhaustively)",
+    )
+    fz.add_argument("--seed", type=int, default=7)
+    fz.add_argument(
+        "--slow", type=float, default=3.0, help="seconds after which a single call counts as slow"
+    )
     sub.add_parser("mcp", help="serve the harness as an MCP server over stdio")
     sub.add_parser("validate-fixtures", help="check fixture manifests, checksums, labels, content")
     f = sub.add_parser(
@@ -142,6 +156,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[{c.outcome:>7}] {c.id}: {c.claim}" + (f"  <- {c.detail}" if c.detail else ""))
         print(json.dumps(doc["summary"]))
         return record.exit_code
+    if ns.cmd == "fuzz":
+        from .fuzz import default_plans, format_report, reference_intake, run_fuzz
+        from .product_adapter import ProductUnavailable
+
+        try:
+            report = run_fuzz(
+                default_plans(reference_intake(), sample_intake_paths=ns.sample),
+                seed=ns.seed,
+                slow_s=ns.slow,
+            )
+        except ProductUnavailable as exc:
+            print(f"NOT FUZZED: {exc}", file=sys.stderr)
+            return 2
+        print("\n".join(format_report(report)))
+        return 0 if report.healthy else 1
     if ns.cmd == "mcp":
         from .mcp_server import main as mcp_main
 
