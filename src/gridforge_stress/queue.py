@@ -473,6 +473,7 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
     avoided_rows = 0
     by_status_dedup: dict[str, float] = {}
     by_status_naive: dict[str, float] = {}
+    by_region_status: dict[str, dict[str, float]] = {}
     nonpositive = 0
     for r in records:
         if FLAG_NONPOS_CAP in r.flags:
@@ -491,6 +492,9 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
             first[key] = r
         dedup += r.capacity_mw
         by_status_dedup[r.status] = by_status_dedup.get(r.status, 0.0) + r.capacity_mw
+        region = str(r.raw.get("region") or "(blank)")
+        cell = by_region_status.setdefault(region, {})
+        cell[r.status] = cell.get(r.status, 0.0) + r.capacity_mw
     return {
         "label": "capacity as published in the capacity column (unit UNVERIFIED, presumed MW), counted once per "
         "(entity, id) request; not available capacity, not a connection probability",
@@ -502,6 +506,10 @@ def capacity_summary(records: Iterable[QueueRecord]) -> dict[str, Any]:
         "keys_with_differing_capacity": len(differing),
         "by_status_deduplicated": {k: round(v, 3) for k, v in sorted(by_status_dedup.items())},
         "by_status_naive": {k: round(v, 3) for k, v in sorted(by_status_naive.items())},
+        "by_region_status_deduplicated": {
+            region: {k: round(v, 3) for k, v in sorted(cell.items())}
+            for region, cell in sorted(by_region_status.items())
+        },
     }
 
 

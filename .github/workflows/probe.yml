@@ -41,6 +41,12 @@ jobs:
         run: |
           set -o pipefail
           uv run --locked gridforge-stress probe lbnl-queued-up --queue-stats --show-sheet "37. IR to COD - all" | tee probe-queue-stats.txt
+      - name: The publisher's codebook and its own sample-by-region sheet (to settle the capacity unit and cross-check regional totals)
+        if: always() && github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress probe lbnl-queued-up --show-sheet "04. Data Codebook" --show-sheet "02. Data Sample by Region" --show-sheet "07. Active Capacity by Year" | tee probe-codebook.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -50,4 +56,5 @@ jobs:
             probe-workbook.json
             probe-profile.txt
             probe-queue-stats.txt
+            probe-codebook.txt
           if-no-files-found: ignore
