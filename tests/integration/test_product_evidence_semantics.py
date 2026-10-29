@@ -311,28 +311,18 @@ def test_a_sound_intake_gains_no_plausibility_caveat(intake, baseline):
     assert not [c for c in baseline["caveats"] if "firm supply ceiling" in c]
 
 
-# --- gaps still open in the product (strict xfail; AssertionError only) -------------------------------------------
+# --- inputs that cannot describe a working site ------------------------------------------------------------------
 
 
 IMPOSSIBLE = {
+    "it_load_far_above_contracted_power": lambda x: x["grid"].__setitem__("current_it_load_MW", 99),
     "build_year_in_the_future": lambda x: x["hall"].__setitem__("build_year", 2099),
 }
+#: Both gaps are closed in the product: the IT-load case by the /v1/compare plausibility findings (PR #90) and the
+#: build-year case by the loader refusal (PR #92). Nothing here is pinned as an open gap any more.
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param(
-            n,
-            marks=pytest.mark.xfail(
-                strict=True,
-                raises=AssertionError,
-                reason=f"{n}: accepted with no refusal and no caveat (observed)",
-            ),
-        )
-        for n in sorted(IMPOSSIBLE)
-    ],
-)
+@pytest.mark.parametrize("name", sorted(IMPOSSIBLE))
 def test_physically_impossible_or_contradictory_inputs_must_be_refused_or_caveated(
     intake, baseline, name
 ):

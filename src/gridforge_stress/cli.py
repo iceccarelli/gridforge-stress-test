@@ -31,6 +31,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     br.add_argument(
         "--context", default="cod_2018_2025", choices=["all_cod_years", "cod_2018_2025"]
     )
+    wf = sub.add_parser(
+        "workflow",
+        help="run the product's real compare/screen/diff journey on an intake and judge it (PASS/FAIL/BLOCKED)",
+    )
+    wf.add_argument("intake", help="path to a GridForge intake JSON")
+    wf.add_argument("-o", "--output", default=None, help="write the decision record JSON here")
     fz = sub.add_parser(
         "fuzz",
         help="hostile-input fuzz of every product route (needs the product checkout); exit 1 if anything escapes as a server fault or is slow",
@@ -137,6 +143,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"NOT BRIDGED: {exc}", file=sys.stderr)
             return 2
         return 0
+    if ns.cmd == "workflow":
+        from pathlib import Path
+
+        from .workflow import run
+
+        record = run(json.loads(Path(ns.intake).read_text()))
+        doc = record.to_json()
+        if ns.output:
+            Path(ns.output).write_text(json.dumps(doc, indent=2) + "\n")
+        for c in record.checks:
+            print(f"[{c.outcome:>7}] {c.id}: {c.claim}" + (f"  <- {c.detail}" if c.detail else ""))
+        print(json.dumps(doc["summary"]))
+        return record.exit_code
     if ns.cmd == "fuzz":
         from .fuzz import default_plans, format_report, reference_intake, run_fuzz
         from .product_adapter import ProductUnavailable

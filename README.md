@@ -38,6 +38,19 @@ hall) and sets it beside LBNL's observed US generation-queue request-to-in-servi
 load-connection time, it is labelled "scale reference only" unless the site is in the US, and it refuses (never defaults)
 when the product payload lacks the assumption (e.g. the public tier). Also available as the MCP tool `context_bridge`.
 
+## End-to-end workflow oracle (the example pack)
+`uv run --locked gridforge-stress workflow data/fixtures/product/nordic_ai_ready_intake.json -o record.json` drives the
+product's REAL `compare`, `screen` and `diff` handlers through the customer journey (intake, comparison, what-ifs) and
+judges every answer against expectations derived from the intake and from physics bounds, not from the product's own
+arithmetic: supply bound, monotonicity of relief, ranking, critical-path dates and their labels, capex bands,
+no-overclaim, diff-vs-compare agreement, determinism, and "an omitted lead time is never silent". Each check ends in
+PASS, FAIL, BLOCKED or UNCHECKED; the exit code is 0 only when every check passed (1 on a FAIL, 3 otherwise), and the JSON
+record names the engine build it judged, what the oracle cannot judge (`limitations`) and unresolved scope questions for
+the product owner (`open_questions`). The example pack is a synthetic hall that hosts racks under hybrid DLC today while
+full DLC needs facility-water relief. This oracle found, on product `main`, that an omitted transformer lead time became a
+silent 160-week placeholder that sets the date; the fix is GridForge-AI PR 92, so run `product-integration` with
+`product_ref=claude/ecstatic-cerf-tvf84h` until it merges.
+
 ## First working example
 `tests/integration/test_product_ttp.py` feeds a synthetic reference hall through the product's real
 `/v1/compare` handler and checks the date (160 weeks, set by the transformer lead time) against an independent
