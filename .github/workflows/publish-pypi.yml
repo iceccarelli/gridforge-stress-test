@@ -1,0 +1,75 @@
+name: publish-pypi
+
+# Publishing gridforge-stress to PyPI. Manual, deliberate, and without a stored token: PyPI Trusted Publishing exchanges this run's
+# identity for a short-lived upload credential, so there is no API token in the repository, in a secret, or in a log.
+#
+# One-time setup the OWNER does (nothing here can do it):
+#   1. PyPI -> Your projects -> Publishing -> add a pending publisher for the project name `gridforge-stress`:
+#        owner `iceccarelli`, repository `gridforge-stress-test`, workflow `publish-pypi.yml`, environment `pypi`.
+#   2. GitHub -> Settings -> Environments -> create `pypi` and add yourself as a required reviewer.
+#   3. Choose a licence and commit it as LICENSE at the repository root. This workflow refuses to run without one; the agent that
+#      maintains this repository does not choose a licence for the owner.
+#
+# A published version can never be replaced or re-used. The run refuses unless the operator types the exact version, the version is not
+# already on PyPI, and the build passes the same checks as CI.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type the exact version in pyproject.toml to publish it (it cannot be undone or re-uploaded)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: A licence must exist before anything is published
+        run: |
+          ls LICENSE LICENSE.txt LICENSE.md 2>/dev/null | head -1 | grep -q . || { echo "No LICENSE file. The owner must choose and commit a licence before gridforge-stress is published."; exit 1; }
+      - id: v
+        name: The typed version must be the version being built
+        env:
+          CONFIRM: ${{ inputs.confirm }}   # through the environment, never interpolated into the script
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          test "$version" = "$CONFIRM" || { echo "confirm is '$CONFIRM' but pyproject.toml says '$version'"; exit 1; }
+      - name: That version must not already be on PyPI
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/gridforge-stress/${{ steps.v.outputs.version }}/json")
+          echo "PyPI answered $code for gridforge-stress ${{ steps.v.outputs.version }}"
+          test "$code" = "404" || { echo "this version already exists on PyPI (or PyPI could not be asked); a release cannot be replaced"; exit 1; }
+      - run: uv sync --locked --all-groups
+      - name: The same checks CI runs
+        run: |
+          uv run --locked ruff check .
+          uv run --locked mypy src
+          uv run --locked pytest
+      - run: uv build
+      - run: uvx --from twine==6.1.0 twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

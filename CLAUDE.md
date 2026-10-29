@@ -40,6 +40,11 @@ Live, read-only evidence (needs outbound network; in practice run via the `probe
 Product is `../GridForge-AI` (override with `GRIDFORGE_PRODUCT_DIR`). Call only its real handlers
 (`/v1/compare`, `/v1/screen`, `/v1/diff` via `product_adapter.call`). Product changes go on a feature branch, never `main`.
 
+## Release
+Publishing to PyPI is `.github/workflows/publish-pypi.yml`: manual, Trusted Publishing (no token anywhere), refuses without a `LICENSE` file
+(the owner chooses the licence; never choose one for them), a typed version and a version not already on PyPI. CI installs the built wheel into a
+clean environment and runs it offline before anything is published.
+
 ## Branch safety
 No force-push, reset --hard, clean, or stash. Do not merge PRs. Do not choose a licence for the owner.
 
