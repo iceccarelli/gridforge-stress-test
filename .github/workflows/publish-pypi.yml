@@ -54,7 +54,7 @@ jobs:
           uv run --locked mypy src
           uv run --locked pytest
       - run: uv build
-      - run: uvx --from twine==6.1.0 twine check --strict dist/*
+      - run: uvx twine check --strict dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: dist

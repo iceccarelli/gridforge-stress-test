@@ -49,5 +49,5 @@ def test_no_licence_is_claimed_without_a_licence_file():
 
 def test_ci_runs_the_installed_wheel_not_only_the_source_tree():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
-    assert "twine==" in ci, "twine is pinned"
+    assert "twine check --strict" in ci, "the built metadata is checked the way PyPI will read it"
     assert "site-packages" in ci and 'gridforge-stress" validate-fixtures' in ci

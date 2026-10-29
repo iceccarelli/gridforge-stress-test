@@ -45,7 +45,9 @@ jobs:
               assert any(n.endswith(need) for n in names), need
           PY
       - name: twine check (the metadata renders on PyPI)
-        run: uvx --from twine==6.1.0 twine check --strict dist/*
+        # Deliberately not pinned: twine only reads the built files (no credentials), and a pinned release rejects the metadata version the
+        # current hatchling writes ('2.5 is not a valid metadata version' with twine 6.1.0).
+        run: uvx twine check --strict dist/*
       - name: Install the wheel into a clean environment, away from the checkout, and run it offline
         run: |
           uv venv "$RUNNER_TEMP/venv"
