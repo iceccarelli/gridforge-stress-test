@@ -243,46 +243,6 @@ def test_public_screen_names_the_binding_item_but_never_a_duration(intake):
             assert key not in ttp, key
 
 
-# --- gaps observed in the product (strict xfail; AssertionError only) ----------------------------------------------
-
-
-def _refused_flagged_or_unchanged(out, baseline, same_racks=True):
-    if not out["ok"]:
-        return True
-    flagged = out["result"]["caveats"] != baseline["caveats"]
-    return flagged or (
-        same_racks and full_dlc_btm_racks(out["result"]) == full_dlc_btm_racks(baseline)
-    )
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="a duplicated BESS option (same id) is counted twice: full_dlc_btm 62 -> 69 racks, no caveat",
-)
-def test_a_duplicated_option_must_not_create_capacity(intake, baseline):
-    out = compare(
-        mutated(intake, lambda x: x["btm_options"].append(copy.deepcopy(x["btm_options"][0])))
-    )
-    assert _refused_flagged_or_unchanged(out, baseline)
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="a duplicated transformer entry (same id) changes the answer with no caveat or refusal",
-)
-def test_a_duplicated_transformer_must_not_change_the_answer_silently(intake, baseline):
-    out = compare(
-        mutated(intake, lambda x: x["transformers"].append(copy.deepcopy(x["transformers"][0])))
-    )
-    assert (
-        not out["ok"]
-        or out["result"]["caveats"] != baseline["caveats"]
-        or answer(out["result"]) == answer(baseline)
-    )
-
-
 # --- gaps the product has fixed (PR #87): now ordinary regression tests -----------------------------------------
 
 
@@ -315,19 +275,25 @@ def test_the_product_ceiling_is_a_boundary_not_a_blanket_refusal(intake):
     assert at_ceiling["ok"], at_ceiling
 
 
-# --- gaps still open in the product (strict xfail; AssertionError only) -------------------------------------------
+@pytest.mark.parametrize("section", ["btm_options", "transformers"])
+def test_a_duplicated_equipment_id_is_refused_not_counted_twice(intake, section):
+    """Fixed in the product (PR #88): a repeated BESS entry used to take full_dlc_btm from 62 to 69 racks, silently."""
+    out = compare(mutated(intake, lambda x: x[section].append(copy.deepcopy(x[section][0]))))
+    repeated = intake[section][0]["id"]
+    assert out["ok"] is False and out["error"] == "IntakeError", out
+    assert f"{section} names {repeated}" in out["message"] and "twice" in out["message"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="an unknown evidence class ('E9') on an intake input is accepted silently",
-)
-def test_an_unknown_evidence_class_must_be_refused(intake):
+def test_an_unknown_evidence_class_is_refused_by_field_name(intake):
     def claim(x):
         x["thermal"]["residual_air_capacity_kW_per_rack"]["evidence"] = "E9"
 
-    assert compare(mutated(intake, claim))["ok"] is False
+    out = compare(mutated(intake, claim))
+    assert _refused_naming(out, "residual_air_capacity_kW_per_rack"), out
+    assert "'E9'" in out["message"]
+
+
+# --- gaps still open in the product (strict xfail; AssertionError only) -------------------------------------------
 
 
 IMPOSSIBLE = {
