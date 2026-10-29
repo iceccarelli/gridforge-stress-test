@@ -1,0 +1,138 @@
+{
+  "project": {
+    "client": "AI-Ready Nordic Hall (synthetic)",
+    "reference": "EXAMPLE-PASS-01/DH-07",
+    "objective": "max_compute",
+    "note": "SYNTHETIC REFERENCE DATA — not a customer asset. Authored by the stress harness to exercise the workflow; no value is a measurement."
+  },
+  "site": {
+    "id": "EXAMPLE-NORDIC-01",
+    "name": "Synthetic Nordic Campus",
+    "country": "SE",
+    "metro": "Stockholm",
+    "design_drybulb_C": 24,
+    "design_wetbulb_C": 17
+  },
+  "hall": {
+    "id": "DH-07",
+    "build_year": 2023,
+    "floor_type": "raised_floor",
+    "net_white_space_m2": 2400,
+    "floor_loading_kPa": {
+      "value": 12,
+      "note": "Design value from the building record, not a survey"
+    },
+    "clear_height_m": 3.2,
+    "aisle_pitch_m": 2.4,
+    "rack_positions": 560,
+    "positions_available": 180,
+    "design_density_kW_per_rack": 8,
+    "containment": "cold_aisle"
+  },
+  "grid": {
+    "dso": "Reference DSO",
+    "firm_capacity_MVA": 30.0,
+    "power_factor": 0.97,
+    "contracted_MW": 27.0,
+    "current_site_peak_MW": {
+      "value": 9.0,
+      "note": "synthetic"
+    },
+    "current_it_load_MW": 6.0,
+    "queue_note": "No new or increased connection capacity is available from the DSO in this metro before the 2030s. The existing firm capacity is therefore the asset, and the whole question is how much compute can be produced from it."
+  },
+  "transformers": [
+    {
+      "id": "TX-A/B",
+      "unit_rating_MVA": 8.0,
+      "units": 3,
+      "redundancy": "N+1",
+      "derating_factor": 0.9,
+      "replacement_lead_time_weeks": 160
+    }
+  ],
+  "ups": [
+    {
+      "id": "UPS-1",
+      "unit_rating_kW": 2400,
+      "units": 6,
+      "redundancy": "N+1",
+      "step_load_capability": 0.5
+    }
+  ],
+  "lv": {
+    "voltage_V": 400,
+    "phases": 3,
+    "busway_ampacity_A": {
+      "value": 1000,
+      "note": "Synthetic: modern AI-ready busway"
+    },
+    "busway_runs": 8,
+    "busway_utilisation_limit": 0.8,
+    "tapoff_max_A": 400
+  },
+  "thermal": {
+    "plant": {
+      "id": "CH-PLANT",
+      "chilled_water_capacity_kW": 14000,
+      "design_supply_C": 20,
+      "design_return_C": 30,
+      "pump_flow_capacity_l_per_min": 30000,
+      "available_head_kPa": 300,
+      "free_cooling_hours_per_year": 6500
+    },
+    "residual_air_capacity_kW_per_rack": {
+      "value": 22,
+      "note": "Synthetic: assumed, not measured"
+    },
+    "cdus": [
+      {
+        "id": "CDU-BANK-A",
+        "rated_capacity_kW": 1000,
+        "rated_approach_K": 3,
+        "rated_flow_l_per_min": 1500,
+        "units": 8,
+        "redundancy": "N+1"
+      }
+    ]
+  },
+  "compute": {
+    "platform": "gb300_nvl72",
+    "utilisation": 0.75,
+    "default_architecture": "hybrid_dlc"
+  },
+  "btm_options": [
+    {
+      "id": "BESS-2MW-8MWh",
+      "kind": "bess",
+      "capacity_MW": 2.0,
+      "capex_eur_per_kW": 900,
+      "lead_time_weeks": 30,
+      "firm": true,
+      "firm_capacity_factor": 0.5,
+      "permitting_note": "No combustion consent required; grid-code compliance and fire separation govern the programme."
+    },
+    {
+      "id": "GEN-5MW",
+      "kind": "gas_engine",
+      "capacity_MW": 5.0,
+      "capex_eur_per_kW": 800,
+      "lead_time_weeks": 44,
+      "firm": true,
+      "opex_eur_per_MWh": 95,
+      "annual_run_hours": 5000,
+      "fixed_om_eur_per_kW_year": 18,
+      "permitting_note": "Emissions consent and fuel supply are the schedule risk, not the equipment."
+    }
+  ],
+  "economics": {
+    "horizon_years": 10
+  },
+  "scenarios": [
+    "retained_air",
+    "rdhx",
+    "hybrid_dlc",
+    "full_dlc",
+    "full_dlc_btm"
+  ]
+}

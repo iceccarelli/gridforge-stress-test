@@ -1,0 +1,27 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "lbnl-queued-up",
+  "source_url": "https://emp.lbl.gov/queues",
+  "origin": "synthetic_fixture",
+  "retrieved_at": null,
+  "retrieval_status": "synthetic",
+  "response_status": null,
+  "sha256": "dda1cc174ce5e96c3a00f7434947f851b72624f71ab309914fe4ad5afef317fb",
+  "byte_count": 3611,
+  "record_count": null,
+  "time_coverage": null,
+  "upstream_release": "authored in this repository; derived by hand from the product's reference hall shape, then tuned against the real /v1/compare so a hybrid-DLC scenario can host racks as found",
+  "units": {
+    "capacity": "MW/MVA/kW per product intake schema",
+    "lead_time": "weeks"
+  },
+  "transformations": [
+    "raised busway/tap-off, UPS, transformer, grid and plant figures; added installed CDUs; moved site to a cool-climate design dry-bulb of 24 C"
+  ],
+  "limitations": [
+    "SYNTHETIC: every figure is invented to exercise the workflow; not source-derived and not a measurement",
+    "source_id is a placeholder required by the manifest schema; the file has no external publisher",
+    "design dry-bulb 24 C is a plausible cool-climate value, not a looked-up design condition for any real site"
+  ],
+  "attribution": "Authored by the gridforge-stress project as synthetic test data; no external attribution applies."
+}

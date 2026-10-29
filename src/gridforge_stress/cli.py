@@ -31,6 +31,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     br.add_argument(
         "--context", default="cod_2018_2025", choices=["all_cod_years", "cod_2018_2025"]
     )
+    wf = sub.add_parser(
+        "workflow",
+        help="run the product's real compare/screen/diff journey on an intake and judge it (PASS/FAIL/BLOCKED)",
+    )
+    wf.add_argument("intake", help="path to a GridForge intake JSON")
+    wf.add_argument("-o", "--output", default=None, help="write the decision record JSON here")
     sub.add_parser("mcp", help="serve the harness as an MCP server over stdio")
     sub.add_parser("validate-fixtures", help="check fixture manifests, checksums, labels, content")
     f = sub.add_parser(
@@ -123,6 +129,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"NOT BRIDGED: {exc}", file=sys.stderr)
             return 2
         return 0
+    if ns.cmd == "workflow":
+        from pathlib import Path
+
+        from .workflow import run
+
+        record = run(json.loads(Path(ns.intake).read_text()))
+        doc = record.to_json()
+        if ns.output:
+            Path(ns.output).write_text(json.dumps(doc, indent=2) + "\n")
+        for c in record.checks:
+            print(f"[{c.outcome:>7}] {c.id}: {c.claim}" + (f"  <- {c.detail}" if c.detail else ""))
+        print(json.dumps(doc["summary"]))
+        return record.exit_code
     if ns.cmd == "mcp":
         from .mcp_server import main as mcp_main
 
