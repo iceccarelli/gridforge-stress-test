@@ -221,6 +221,125 @@ def evaluate_compare(intake: dict[str, Any], out: dict[str, Any]) -> list[Check]
     return res
 
 
+def _strip_context(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        k: v for k, v in payload.items() if k not in ("grid_queue_context", "caveats", "provenance")
+    }
+
+
+def evaluate_queue_context(
+    intake: dict[str, Any],
+    compare: dict[str, Any],
+    api: Callable[..., dict[str, Any]],
+    report_date: str,
+) -> list[Check]:
+    """Judge the product's `grid_queue_context` against THIS harness's own measurement of the same statistic.
+
+    The product ships a copy of LBNL's request-to-operation durations beside its refusal to date grid reinforcement. This does not trust that
+    copy: the expected values are read from the harness fixture (computed in CI from the published workbook), never from the product. A
+    product that does not carry the block yet is not wrong, so nothing is judged then; once it does, every figure must match, the limits must
+    be stated, and asking for a region must change nothing but the block.
+    """
+    ctx = compare.get("grid_queue_context")
+    if ctx is None:
+        return []
+    from .context_bridge import WEEKS_PER_YEAR, _survivorship, load_queue_context, site_country
+
+    doc = load_queue_context()
+    res: list[Check] = []
+
+    def figures(observed: dict[str, Any], expected: dict[str, Any], label: str) -> list[str]:
+        bad = []
+        for have, want in (
+            ("n", "n"),
+            ("p25_years", "p25"),
+            ("median_years", "median"),
+            ("p75_years", "p75"),
+        ):
+            if observed.get(have) != expected[want]:
+                bad.append(
+                    f"{label}: {have} is {observed.get(have)!r}, the independent measurement says {expected[want]!r}"
+                )
+        for have, want in (("p25_weeks", "p25"), ("median_weeks", "median"), ("p75_weeks", "p75")):
+            w = observed.get(have)
+            if not isinstance(w, (int, float)) or abs(w - expected[want] * WEEKS_PER_YEAR) > 0.06:
+                bad.append(f"{label}: {have} {w!r} is not {expected[want]} years in weeks")
+        return bad
+
+    bad = figures(ctx.get("observed", {}), doc["contexts"]["cod_2018_2025"], "pooled")
+    want = _survivorship(doc)
+    have = ctx.get("survivorship") or {}
+    if want is None:
+        bad.append("the harness fixture has no survivorship to compare with")
+    else:
+        for k in ("entered", "operational", "withdrawn", "share_operational_of_entered"):
+            if have.get(k) != want[k]:
+                bad.append(
+                    f"survivorship {k} is {have.get(k)!r}, the independent measurement says {want[k]!r}"
+                )
+        if have.get("unresolved") != want["active"] + want["suspended"] + want["unknown"]:
+            bad.append("survivorship unresolved does not equal active + suspended + unknown")
+    if ctx.get("source", {}).get("workbook_sha256") != doc["provenance"]["workbook_sha256"]:
+        bad.append("the source workbook hash is not the one the harness measured")
+    _check(
+        res,
+        "context.matches_independent_measurement",
+        "the product's queue statistic equals the harness's own measurement of the same workbook",
+        bad,
+    )
+
+    text = " ".join(ctx.get("statements", []))
+    country = site_country(intake)
+    expected_level = (
+        "same_country_context" if country == doc["geography"] else "scale_reference_only"
+    )
+    bad = []
+    if ctx.get("kind") != "context_only":
+        bad.append(f"kind is {ctx.get('kind')!r}, not context_only")
+    for phrase in ("not a connection time for a load", "changes no figure and no evidence class"):
+        if phrase not in text:
+            bad.append(f"the statements no longer say: {phrase}")
+    if len(ctx.get("must_not_claim", [])) < 4 or not any(
+        "evidence class" in m for m in ctx.get("must_not_claim", [])
+    ):
+        bad.append("the claims it refuses to make are missing or incomplete")
+    if not any("Survivorship" in x for x in ctx.get("limits", [])):
+        bad.append("the survivorship limit is not stated")
+    if ctx.get("applicability", {}).get("level") != expected_level:
+        bad.append(
+            f"applicability is {ctx.get('applicability', {}).get('level')!r} for country {country!r}; expected {expected_level}"
+        )
+    if not any("Context only" in c for c in compare.get("caveats", [])):
+        bad.append("the comparison's caveats do not label it context only")
+    _check(
+        res,
+        "context.limits_are_stated",
+        "it says what it is, what it is not, and whom it applies to",
+        bad,
+    )
+
+    region = "PJM"
+    regional = api(
+        "compare", {"intake": intake, "grid_queue_region": region}, report_date=report_date
+    )
+    bad = []
+    if not regional.get("ok"):
+        bad.append(f"a valid region was refused: {regional.get('message')}")
+    else:
+        out = regional["result"]
+        exp = doc["by_region_cod_2018_2025"][region]
+        bad += figures(out.get("grid_queue_context", {}).get("observed", {}), exp, region)
+        if _strip_context(out) != _strip_context(compare):
+            bad.append("asking for a region changed something other than the context block")
+    _check(
+        res,
+        "context.region_moves_nothing_else",
+        "a region request changes the context block and nothing else in the comparison",
+        bad,
+    )
+    return res
+
+
 def _best_racks(c: dict[str, Any]) -> int:
     """Most after-ladder racks any scenario reaches: the recommended scenario's figure, also when the top is tied."""
     return max((s["after_ladder"]["racks"] for s in c["scenarios"]), default=0)
@@ -388,6 +507,7 @@ def run(
             else [f"screen {pick!r} is not among compare's top {tied}"],
         )
         rec.checks += evaluate_whatifs(intake, compare, api, report_date)
+        rec.checks += evaluate_queue_context(intake, compare, api, report_date)
     except ProductUnavailable as exc:
         rec.checks.append(
             Check(
