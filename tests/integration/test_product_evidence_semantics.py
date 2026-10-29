@@ -293,13 +293,16 @@ def test_an_unknown_evidence_class_is_refused_by_field_name(intake):
     assert "'E9'" in out["message"]
 
 
-# --- gaps still open in the product (strict xfail; AssertionError only) -------------------------------------------
+# --- inputs that cannot describe a working site ------------------------------------------------------------------
 
 
 IMPOSSIBLE = {
-    "build_year_in_the_future": lambda x: x["hall"].__setitem__("build_year", 2099),
     "it_load_far_above_contracted_power": lambda x: x["grid"].__setitem__("current_it_load_MW", 99),
+    "build_year_in_the_future": lambda x: x["hall"].__setitem__("build_year", 2099),
 }
+#: Still accepted by the product with no refusal and no caveat (observed); strict xfail flips loudly when fixed.
+#: it_load_far_above_contracted_power was closed by the product's /v1/compare plausibility findings.
+STILL_OPEN = {"build_year_in_the_future"}
 
 
 @pytest.mark.parametrize(
@@ -313,6 +316,8 @@ IMPOSSIBLE = {
                 reason=f"{n}: accepted with no refusal and no caveat (observed)",
             ),
         )
+        if n in STILL_OPEN
+        else n
         for n in sorted(IMPOSSIBLE)
     ],
 )
