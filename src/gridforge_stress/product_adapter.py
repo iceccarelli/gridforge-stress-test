@@ -30,6 +30,29 @@ except Exception as exc:  # report the product's refusal verbatim, do not mask i
     json.dump({"ok": False, "error": type(exc).__name__, "message": str(exc)}, sys.stdout)
 """
 
+#: Drives many (route, body) cases through the product's real handlers in ONE interpreter and classifies each outcome with the same
+#: definition the fuzz runner uses: a refusal the HTTP layer turns into a 4xx is "clean"; any other exception would be a 500 "engine error".
+_BATCH_RUNNER = r"""
+import json, os, sys
+sys.path.insert(0, sys.argv[1])
+os.environ["GRIDFORGE_REPORT_DATE"] = sys.argv[2]
+from gridforge.api import server
+from gridforge.api.tiers import Tier
+from gridforge.intake import loader
+clean = (server.ApiError, loader.IntakeError, ValueError, TypeError, KeyError, ArithmeticError)
+out = []
+for case in json.load(sys.stdin):
+    try:
+        handler = server.ROUTES[case["route"]][0]
+        server._invoke(case["route"], handler, case["body"], Tier(case["tier"]))
+        out.append({"id": case["id"], "status": "ok"})
+    except clean as exc:
+        out.append({"id": case["id"], "status": "clean", "error": type(exc).__name__, "message": str(exc)[:200]})
+    except BaseException as exc:
+        out.append({"id": case["id"], "status": "fault", "error": type(exc).__name__, "message": str(exc)[:200]})
+json.dump(out, sys.stdout)
+"""
+
 GRADE_ORDER = ("undated", "indicative", "screening")
 #: Highest product grade the harness lets a claim carry at each evidence level (see evidence.assess).
 MAX_GRADE = {
@@ -92,6 +115,34 @@ def call(
         raise ProductUnavailable(f"product runner failed: {proc.stderr[-400:]}")
     parsed: dict[str, Any] = json.loads(proc.stdout)
     return parsed
+
+
+def call_batch(
+    cases: list[dict[str, Any]],
+    *,
+    report_date: str = "2026-10-27",
+    root: Path | None = None,
+    timeout: int = 600,
+) -> dict[str, dict[str, Any]]:
+    """Run `cases` ({id, route, tier, body}) through the real handlers; returns {id: {status: ok|clean|fault, error?, message?}}.
+
+    Unlike `call`, which names only the three journey endpoints, this reaches any registered route so a defect found by the fuzz can be
+    reproduced on the route where it escaped. Bodies travel as JSON (NaN/Infinity included, as Python's JSON parser accepts them).
+    """
+    root = root or product_dir()
+    proc = subprocess.run(  # noqa: S603
+        [sys.executable, "-I", "-c", _BATCH_RUNNER, str(root), report_date],
+        input=json.dumps(cases),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+        env={k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG")},
+    )
+    if proc.returncode != 0:
+        raise ProductUnavailable(f"product runner failed: {proc.stderr[-400:]}")
+    rows: list[dict[str, Any]] = json.loads(proc.stdout)
+    return {r["id"]: r for r in rows}
 
 
 def compare(
