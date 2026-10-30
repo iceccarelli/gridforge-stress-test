@@ -524,8 +524,44 @@ def with_price(**over) -> dict:
     return out
 
 
-def state_api(compare_out: dict, *, block=None, change=None):
+def price_document(
+    *,
+    ind="96.4",
+    com="144.7",
+    used=140,
+    heading=True,
+    disclaimer=True,
+    convert_note=True,
+    order_ok=True,
+) -> str:
+    section = (
+        "## 6. Electricity price: what has been published (context only)\n\n"
+        f"- U.S. Total, 2026-08: industrial customers paid {ind} US dollars per MWh on average and commercial customers {com} US dollars per MWh.\n"
+        f"- This document uses {used} euros per MWh (library placeholder).\n"
+        + (
+            "- The two figures are in different currencies and are not converted here.\n"
+            if convert_note
+            else ""
+        )
+        + ("\n> Context only: this is not the tariff for this site.\n" if disclaimer else "")
+    )
+    nxt = "## 7. Recommended next step\n\ntext\n"
+    body = (section + nxt) if order_ok else (nxt + section)
+    if not heading:
+        body = body.replace("Electricity price: what has been published (context only)", "Other")
+    return "# Density Screen\n\n" + body
+
+
+def state_api(compare_out: dict, *, block=None, change=None, document=None):
     def api(route, body, report_date="2026-10-27"):
+        if route == "screen":
+            return {
+                "ok": True,
+                "result": {
+                    "format": "md",
+                    "document": document if document is not None else price_document(),
+                },
+            }
         out = copy.deepcopy(compare_out)
         out["retail_price_context"] = block or price_block("Virginia")
         if change:
@@ -544,12 +580,41 @@ def test_a_product_without_the_price_block_is_not_judged_for_it():
     assert W.evaluate_price_context(INTAKE, payload(), state_api(payload()), "2026-10-27") == []
 
 
-def test_a_faithful_copy_of_the_parse_passes_all_three_checks():
+def test_a_faithful_copy_of_the_parse_passes_all_four_checks():
     assert judged_price(with_price()) == {
         "context.price_matches_independent_parse": "PASS",
         "context.price_limits_are_stated": "PASS",
         "context.price_state_moves_nothing_else": "PASS",
+        "context.price_document_matches": "PASS",
     }
+
+
+@pytest.mark.parametrize(
+    "doc",
+    [
+        price_document(ind="86.4"),
+        price_document(com="14.47"),
+        price_document(used=125),
+        price_document(heading=False),
+        price_document(disclaimer=False),
+        price_document(convert_note=False),
+        price_document(order_ok=False),
+    ],
+    ids=[
+        "industrial",
+        "commercial",
+        "price-used",
+        "no-section",
+        "no-disclaimer",
+        "no-conversion-note",
+        "wrong-order",
+    ],
+)
+def test_a_document_that_misstates_the_prices_or_drops_a_limit_fails(doc):
+    out = with_price()
+    assert (
+        judged_price(out, state_api(out, document=doc))["context.price_document_matches"] == "FAIL"
+    )
 
 
 def test_a_wrong_industrial_price_fails_the_figures_check_and_names_it():
@@ -593,3 +658,23 @@ def test_a_state_request_that_returns_other_figures_or_moves_something_fails():
     moved = state_api(out, change=lambda o: o.update(headline="changed"))
     # the compare payload built by payload() carries no headline key; any added key is a movement
     assert judged_price(out, moved)["context.price_state_moves_nothing_else"] == "FAIL"
+
+
+def test_a_tariff_declared_as_value_and_note_is_judged_as_declared_not_as_a_placeholder():
+    intake = copy.deepcopy(INTAKE)
+    intake.setdefault("economics", {})["electricity_eur_per_MWh"] = {
+        "value": 125,
+        "note": "contract",
+    }
+    out = with_price()
+    out["retail_price_context"]["assumed"] = {
+        "eur_per_MWh": 125.0,
+        "source": "declared by the buyer (economics.electricity_eur_per_MWh)",
+        "evidence_class_unchanged": True,
+    }
+    checks = W.evaluate_price_context(intake, out, state_api(out), "2026-10-27")
+    assert {c.id: c.outcome for c in checks}["context.price_limits_are_stated"] == "PASS"
+    # and a product that still calls that declared price a placeholder, or reports another number, is caught
+    out["retail_price_context"]["assumed"]["eur_per_MWh"] = 140.0
+    checks = W.evaluate_price_context(intake, out, state_api(out), "2026-10-27")
+    assert {c.id: c.outcome for c in checks}["context.price_limits_are_stated"] == "FAIL"
