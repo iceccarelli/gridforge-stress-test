@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_registry_and_catalogue_valid():
-    assert len(load_sources()) == 9
+    assert len(load_sources()) == 10
     assert {s["id"] for s in load_scenarios()} == {f"GF-00{i}" for i in range(1, 9)}
 
 

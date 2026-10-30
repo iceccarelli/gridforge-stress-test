@@ -1,0 +1,642 @@
+{
+ "schema": "gridforge-stress/price-context/1",
+ "source_id": "eia-epm",
+ "evidence_kind": "retail_price_statistic",
+ "geography": "US states",
+ "unit": "US cents per kWh",
+ "period": "2026-08",
+ "prior_period": "2025-08",
+ "release_date": "October 23, 2026",
+ "definition": "Average price to ultimate customers in the sector for one month (EIA-861M): revenue divided by sales, so it includes delivery and every customer in the sector. NOT the tariff of any load, NOT a data-centre price, NOT a forecast.",
+ "provenance": {
+  "measured_on": "2026-10-30",
+  "page": "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a",
+  "page_sha256": "042269100ad9e52865ce21692337baa25ef0385e653189f51001ba348d7e3603",
+  "page_bytes": 105641,
+  "retrieval": "one plain HTTP GET (status 200) from the build sandbox, not through the harness fetch path; re-verifiable through the probe workflow",
+  "parser": "gridforge_stress.price.parse_table_5_6_a",
+  "status_of_values": "EIA: values for the prior year are final; values for the current month are preliminary estimates"
+ },
+ "rows": {
+  "New England": {
+   "commercial": {
+    "current": 22.24,
+    "prior": 22.61
+   },
+   "industrial": {
+    "current": 17.56,
+    "prior": 17.68
+   }
+  },
+  "Connecticut": {
+   "commercial": {
+    "current": 19.29,
+    "prior": 23.47
+   },
+   "industrial": {
+    "current": 16.18,
+    "prior": 18.91
+   }
+  },
+  "Maine": {
+   "commercial": {
+    "current": 21.33,
+    "prior": 21.25
+   },
+   "industrial": {
+    "current": 14.24,
+    "prior": 15.27
+   }
+  },
+  "Massachusetts": {
+   "commercial": {
+    "current": 24.11,
+    "prior": 23.15
+   },
+   "industrial": {
+    "current": 20.03,
+    "prior": 19.17
+   }
+  },
+  "New Hampshire": {
+   "commercial": {
+    "current": 20.99,
+    "prior": 20.43
+   },
+   "industrial": {
+    "current": 17.26,
+    "prior": 16.95
+   }
+  },
+  "Rhode Island": {
+   "commercial": {
+    "current": 23.31,
+    "prior": 22.23
+   },
+   "industrial": {
+    "current": 19.87,
+    "prior": 19.84
+   }
+  },
+  "Vermont": {
+   "commercial": {
+    "current": 20.47,
+    "prior": 19.05
+   },
+   "industrial": {
+    "current": 12.72,
+    "prior": 12.05
+   }
+  },
+  "Middle Atlantic": {
+   "commercial": {
+    "current": 19.62,
+    "prior": 18.85
+   },
+   "industrial": {
+    "current": 11.04,
+    "prior": 10.27
+   }
+  },
+  "New Jersey": {
+   "commercial": {
+    "current": 18.71,
+    "prior": 18.52
+   },
+   "industrial": {
+    "current": 16.24,
+    "prior": 15.06
+   }
+  },
+  "New York": {
+   "commercial": {
+    "current": 23.06,
+    "prior": 22.33
+   },
+   "industrial": {
+    "current": 10.54,
+    "prior": 10.2
+   }
+  },
+  "Pennsylvania": {
+   "commercial": {
+    "current": 13.93,
+    "prior": 12.68
+   },
+   "industrial": {
+    "current": 10.47,
+    "prior": 9.66
+   }
+  },
+  "East North Central": {
+   "commercial": {
+    "current": 13.95,
+    "prior": 13.29
+   },
+   "industrial": {
+    "current": 10.02,
+    "prior": 9.11
+   }
+  },
+  "Illinois": {
+   "commercial": {
+    "current": 14.67,
+    "prior": 13.94
+   },
+   "industrial": {
+    "current": 11.33,
+    "prior": 10.18
+   }
+  },
+  "Indiana": {
+   "commercial": {
+    "current": 13.29,
+    "prior": 13.86
+   },
+   "industrial": {
+    "current": 9.28,
+    "prior": 8.98
+   }
+  },
+  "Michigan": {
+   "commercial": {
+    "current": 16.21,
+    "prior": 14.85
+   },
+   "industrial": {
+    "current": 8.99,
+    "prior": 8.4
+   }
+  },
+  "Ohio": {
+   "commercial": {
+    "current": 12.31,
+    "prior": 11.42
+   },
+   "industrial": {
+    "current": 9.75,
+    "prior": 8.47
+   }
+  },
+  "Wisconsin": {
+   "commercial": {
+    "current": 14.19,
+    "prior": 13.6
+   },
+   "industrial": {
+    "current": 10.88,
+    "prior": 9.58
+   }
+  },
+  "West North Central": {
+   "commercial": {
+    "current": 12.07,
+    "prior": 11.53
+   },
+   "industrial": {
+    "current": 9.16,
+    "prior": 8.81
+   }
+  },
+  "Iowa": {
+   "commercial": {
+    "current": 14.15,
+    "prior": 12.87
+   },
+   "industrial": {
+    "current": 9.31,
+    "prior": 8.94
+   }
+  },
+  "Kansas": {
+   "commercial": {
+    "current": 12.24,
+    "prior": 11.82
+   },
+   "industrial": {
+    "current": 8.49,
+    "prior": 8.22
+   }
+  },
+  "Minnesota": {
+   "commercial": {
+    "current": 13.41,
+    "prior": 13.11
+   },
+   "industrial": {
+    "current": 9.96,
+    "prior": 9.47
+   }
+  },
+  "Missouri": {
+   "commercial": {
+    "current": 12.63,
+    "prior": 12.26
+   },
+   "industrial": {
+    "current": 9.89,
+    "prior": 9.38
+   }
+  },
+  "Nebraska": {
+   "commercial": {
+    "current": 10.0,
+    "prior": 9.09
+   },
+   "industrial": {
+    "current": 8.37,
+    "prior": 8.7
+   }
+  },
+  "North Dakota": {
+   "commercial": {
+    "current": 8.07,
+    "prior": 7.47
+   },
+   "industrial": {
+    "current": 8.12,
+    "prior": 7.62
+   }
+  },
+  "South Dakota": {
+   "commercial": {
+    "current": 11.71,
+    "prior": 10.64
+   },
+   "industrial": {
+    "current": 9.43,
+    "prior": 8.67
+   }
+  },
+  "South Atlantic": {
+   "commercial": {
+    "current": 12.31,
+    "prior": 11.22
+   },
+   "industrial": {
+    "current": 9.77,
+    "prior": 8.28
+   }
+  },
+  "Delaware": {
+   "commercial": {
+    "current": 14.5,
+    "prior": 12.68
+   },
+   "industrial": {
+    "current": 10.4,
+    "prior": 9.86
+   }
+  },
+  "District of Columbia": {
+   "commercial": {
+    "current": 23.31,
+    "prior": 20.65
+   },
+   "industrial": {
+    "current": 18.53,
+    "prior": 8.1
+   }
+  },
+  "Florida": {
+   "commercial": {
+    "current": 11.35,
+    "prior": 11.43
+   },
+   "industrial": {
+    "current": 8.93,
+    "prior": 9.01
+   }
+  },
+  "Georgia": {
+   "commercial": {
+    "current": 13.81,
+    "prior": 11.16
+   },
+   "industrial": {
+    "current": 13.05,
+    "prior": 8.2
+   }
+  },
+  "Maryland": {
+   "commercial": {
+    "current": 17.0,
+    "prior": 15.06
+   },
+   "industrial": {
+    "current": 12.19,
+    "prior": 11.37
+   }
+  },
+  "North Carolina": {
+   "commercial": {
+    "current": 10.73,
+    "prior": 10.02
+   },
+   "industrial": {
+    "current": 8.23,
+    "prior": 7.8
+   }
+  },
+  "South Carolina": {
+   "commercial": {
+    "current": 11.76,
+    "prior": 11.0
+   },
+   "industrial": {
+    "current": 7.88,
+    "prior": 7.21
+   }
+  },
+  "Virginia": {
+   "commercial": {
+    "current": 11.14,
+    "prior": 9.85
+   },
+   "industrial": {
+    "current": 9.98,
+    "prior": 9.4
+   }
+  },
+  "West Virginia": {
+   "commercial": {
+    "current": 11.65,
+    "prior": 11.57
+   },
+   "industrial": {
+    "current": 8.34,
+    "prior": 8.23
+   }
+  },
+  "East South Central": {
+   "commercial": {
+    "current": 13.41,
+    "prior": 13.03
+   },
+   "industrial": {
+    "current": 7.53,
+    "prior": 7.27
+   }
+  },
+  "Alabama": {
+   "commercial": {
+    "current": 14.98,
+    "prior": 14.53
+   },
+   "industrial": {
+    "current": 8.11,
+    "prior": 7.76
+   }
+  },
+  "Kentucky": {
+   "commercial": {
+    "current": 12.09,
+    "prior": 11.81
+   },
+   "industrial": {
+    "current": 7.37,
+    "prior": 7.01
+   }
+  },
+  "Mississippi": {
+   "commercial": {
+    "current": 13.45,
+    "prior": 12.88
+   },
+   "industrial": {
+    "current": 7.57,
+    "prior": 7.38
+   }
+  },
+  "Tennessee": {
+   "commercial": {
+    "current": 13.13,
+    "prior": 12.86
+   },
+   "industrial": {
+    "current": 6.92,
+    "prior": 6.85
+   }
+  },
+  "West South Central": {
+   "commercial": {
+    "current": 9.54,
+    "prior": 9.23
+   },
+   "industrial": {
+    "current": 7.16,
+    "prior": 6.5
+   }
+  },
+  "Arkansas": {
+   "commercial": {
+    "current": 11.73,
+    "prior": 10.75
+   },
+   "industrial": {
+    "current": 7.85,
+    "prior": 7.32
+   }
+  },
+  "Louisiana": {
+   "commercial": {
+    "current": 11.09,
+    "prior": 10.9
+   },
+   "industrial": {
+    "current": 6.1,
+    "prior": 6.29
+   }
+  },
+  "Oklahoma": {
+   "commercial": {
+    "current": 10.9,
+    "prior": 10.0
+   },
+   "industrial": {
+    "current": 8.16,
+    "prior": 6.64
+   }
+  },
+  "Texas": {
+   "commercial": {
+    "current": 8.96,
+    "prior": 8.76
+   },
+   "industrial": {
+    "current": 7.21,
+    "prior": 6.42
+   }
+  },
+  "Mountain": {
+   "commercial": {
+    "current": 12.14,
+    "prior": 11.91
+   },
+   "industrial": {
+    "current": 8.71,
+    "prior": 8.65
+   }
+  },
+  "Arizona": {
+   "commercial": {
+    "current": 13.05,
+    "prior": 12.98
+   },
+   "industrial": {
+    "current": 9.73,
+    "prior": 8.88
+   }
+  },
+  "Colorado": {
+   "commercial": {
+    "current": 13.94,
+    "prior": 13.13
+   },
+   "industrial": {
+    "current": 9.98,
+    "prior": 9.64
+   }
+  },
+  "Idaho": {
+   "commercial": {
+    "current": 10.21,
+    "prior": 8.95
+   },
+   "industrial": {
+    "current": 9.71,
+    "prior": 8.66
+   }
+  },
+  "Montana": {
+   "commercial": {
+    "current": 13.64,
+    "prior": 12.53
+   },
+   "industrial": {
+    "current": 7.97,
+    "prior": 7.45
+   }
+  },
+  "Nevada": {
+   "commercial": {
+    "current": 9.8,
+    "prior": 10.05
+   },
+   "industrial": {
+    "current": 10.2,
+    "prior": 9.69
+   }
+  },
+  "New Mexico": {
+   "commercial": {
+    "current": 12.14,
+    "prior": 12.02
+   },
+   "industrial": {
+    "current": 5.08,
+    "prior": 6.37
+   }
+  },
+  "Utah": {
+   "commercial": {
+    "current": 10.39,
+    "prior": 10.82
+   },
+   "industrial": {
+    "current": 8.56,
+    "prior": 9.3
+   }
+  },
+  "Wyoming": {
+   "commercial": {
+    "current": 10.27,
+    "prior": 9.72
+   },
+   "industrial": {
+    "current": 8.8,
+    "prior": 8.69
+   }
+  },
+  "Pacific Contiguous": {
+   "commercial": {
+    "current": 23.87,
+    "prior": 22.94
+   },
+   "industrial": {
+    "current": 17.41,
+    "prior": 17.52
+   }
+  },
+  "California": {
+   "commercial": {
+    "current": 30.02,
+    "prior": 29.24
+   },
+   "industrial": {
+    "current": 24.12,
+    "prior": 23.84
+   }
+  },
+  "Oregon": {
+   "commercial": {
+    "current": 10.72,
+    "prior": 9.84
+   },
+   "industrial": {
+    "current": 8.75,
+    "prior": 8.44
+   }
+  },
+  "Washington": {
+   "commercial": {
+    "current": 11.81,
+    "prior": 11.02
+   },
+   "industrial": {
+    "current": 7.43,
+    "prior": 7.06
+   }
+  },
+  "Pacific Noncontiguous": {
+   "commercial": {
+    "current": 34.46,
+    "prior": 29.65
+   },
+   "industrial": {
+    "current": 34.69,
+    "prior": 27.75
+   }
+  },
+  "Alaska": {
+   "commercial": {
+    "current": 23.9,
+    "prior": 23.09
+   },
+   "industrial": {
+    "current": 23.13,
+    "prior": 20.49
+   }
+  },
+  "Hawaii": {
+   "commercial": {
+    "current": 43.55,
+    "prior": 34.93
+   },
+   "industrial": {
+    "current": 39.33,
+    "prior": 30.37
+   }
+  },
+  "U.S. Total": {
+   "commercial": {
+    "current": 14.47,
+    "prior": 13.87
+   },
+   "industrial": {
+    "current": 9.64,
+    "prior": 8.98
+   }
+  }
+ }
+}
