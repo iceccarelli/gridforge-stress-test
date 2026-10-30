@@ -1,7 +1,7 @@
 """Adversarial and invariant tests through the REAL product handlers (screen, compare, Hall Watch diff).
 
 Opt in with `pytest -m product`. Input is the SYNTHETIC reference-hall fixture. Observations about product
-gaps are pinned with strict xfail so they stay visible and flip loudly when the product changes.
+gaps found in the product stay pinned as strict xfail while open (visible, and loud when fixed), then become ordinary regressions.
 """
 
 from __future__ import annotations
@@ -161,30 +161,34 @@ def test_leader_stable_and_no_leader_on_tied_dates(intake):
     assert all(tied_or_strict), "a 'fastest' leader must be strictly faster; ties must not name one"
 
 
-# --- gaps observed in the product (strict xfail: visible, and loud when fixed) ------------------------------------
+# --- gaps found in the product and since fixed: ordinary regressions now (they were strict xfails until GridForge-AI #102) ----
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,  # a missing/broken product must error, not count as the expected gap
-    reason="product accepts contracted_MW > firm capacity without any caveat",
-)
-def test_contradictory_grid_inputs_should_be_flagged(intake):
+def test_contradictory_grid_inputs_are_flagged(intake):
+    """Contracted power above what the firm connection can deliver is an input discrepancy to confirm, never silence.
+
+    Fixed in the product (GridForge-AI #102); this was a strict xfail until then."""
     base = call("compare", {"intake": intake})["result"]["caveats"]
     odd = call(
         "compare", {"intake": mutated(intake, lambda x: x["grid"].__setitem__("contracted_MW", 50))}
     )
-    assert odd["result"]["caveats"] != base
+    assert odd["ok"], odd
+    caveats = odd["result"]["caveats"]
+    assert caveats != base
+    stated = [c for c in caveats if "contracted" in c.lower() and "firm" in c.lower()]
+    assert len(stated) == 1, caveats  # said once, not dropped and not duplicated
+    assert (
+        "network operator" in stated[0]
+    )  # it asks for confirmation; it does not assert the site is impossible
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="product coerces a numeric string for firm_capacity_MVA while rejecting bool",
-)
-def test_numeric_strings_should_be_refused(intake):
+def test_numeric_strings_are_refused(intake):
+    """A quantity is a JSON number: text is refused exactly as a boolean is, and the field is named.
+
+    Fixed in the product (GridForge-AI #102); this was a strict xfail until then."""
     out = call(
         "compare",
         {"intake": mutated(intake, lambda x: x["grid"].__setitem__("firm_capacity_MVA", "14"))},
     )
     assert out["ok"] is False
+    assert "firm_capacity_MVA" in out["message"] and "string" in out["message"]

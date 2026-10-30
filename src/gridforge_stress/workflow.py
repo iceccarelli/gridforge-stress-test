@@ -444,6 +444,10 @@ def evaluate_price_context(
         "same_country_context" if country in US_COUNTRY_NAMES else "scale_reference_only"
     )
     declared = (intake.get("economics") or {}).get("electricity_eur_per_MWh")
+    if isinstance(
+        declared, dict
+    ):  # a quantity may be given as {"value": 125, "note": ...}; the value is what the buyer declared
+        declared = declared.get("value")
     bad = []
     if ctx.get("kind") != "context_only":
         bad.append(f"kind is {ctx.get('kind')!r}, not context_only")
@@ -494,6 +498,43 @@ def evaluate_price_context(
         res,
         "context.price_state_moves_nothing_else",
         "a state request changes the context block and nothing else in the comparison",
+        bad,
+    )
+
+    # The paid document is what a customer reads, so the same statistic is checked in its text, not only in the JSON.
+    heading = "Electricity price: what has been published (context only)"
+    rendered = api("screen", {"intake": intake, "format": "md"}, report_date=report_date)
+    bad = []
+    if not rendered.get("ok"):
+        bad.append(f"the Density Screen document was refused: {rendered.get('message')}")
+    else:
+        text = str(rendered["result"].get("document", ""))
+        at = text.find(heading)
+        if at < 0:
+            bad.append("the Density Screen document has no electricity-price section")
+        else:
+            nxt = text.find("\n## ", at)
+            body = text[at : nxt if nxt > 0 else len(text)]
+            us = doc["rows"]["U.S. Total"]
+            expected = [
+                f"{us['industrial']['current'] * 10:,.1f} US dollars per MWh",
+                f"{us['commercial']['current'] * 10:,.1f} US dollars per MWh",
+                f"U.S. Total, {doc['period']}",
+                "not converted here",
+                "Context only: this is not the tariff for this site",
+            ]
+            for want in expected:
+                if want not in body:
+                    bad.append(f"the section does not state: {want}")
+            used = ctx.get("assumed", {}).get("eur_per_MWh")
+            if used is not None and f"uses {used:,.0f} euros per MWh" not in body:
+                bad.append(f"the section does not quote the price the run used ({used} EUR/MWh)")
+            if text.find("Recommended next step") < at:
+                bad.append("the section does not come before the recommended next step")
+    _check(
+        res,
+        "context.price_document_matches",
+        "the Density Screen document states the same published prices, the same price used, and the same limits",
         bad,
     )
     return res
