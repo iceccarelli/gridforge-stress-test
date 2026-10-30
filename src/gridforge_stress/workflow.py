@@ -223,7 +223,9 @@ def evaluate_compare(intake: dict[str, Any], out: dict[str, Any]) -> list[Check]
 
 def _strip_context(payload: dict[str, Any]) -> dict[str, Any]:
     return {
-        k: v for k, v in payload.items() if k not in ("grid_queue_context", "caveats", "provenance")
+        k: v
+        for k, v in payload.items()
+        if k not in ("grid_queue_context", "retail_price_context", "caveats", "provenance")
     }
 
 
@@ -369,6 +371,129 @@ def evaluate_queue_context(
         res,
         "context.document_matches",
         "the Density Screen document states the same measured figures and the same limits",
+        bad,
+    )
+    return res
+
+
+PRICE_STATE = "Virginia"
+US_COUNTRY_NAMES = frozenset({"US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"})
+
+
+def evaluate_price_context(
+    intake: dict[str, Any],
+    compare: dict[str, Any],
+    api: Callable[..., dict[str, Any]],
+    report_date: str,
+) -> list[Check]:
+    """Judge the product's `retail_price_context` against THIS harness's own parse of EIA's published table.
+
+    Expected values come from the harness fixture (parsed from Table 5.6.A), never from the product. A product that does not carry the block
+    yet is not judged. Once it does: every published figure and its conversion must match, the limits must be stated (including that
+    currencies are not converted), and asking for a state must change the block and nothing else.
+    """
+    ctx = compare.get("retail_price_context")
+    if ctx is None:
+        return []
+    from .paths import fixtures_dir
+    from .price import load_price_context
+
+    doc = load_price_context(fixtures_dir() / "eia_retail_price_context.json")
+    res: list[Check] = []
+
+    def figures(block: dict[str, Any], area: str) -> list[str]:
+        bad = []
+        obs = block.get("observed", {})
+        if obs.get("area") != area:
+            bad.append(f"area is {obs.get('area')!r}, expected {area!r}")
+        if obs.get("period") != doc["period"]:
+            bad.append(f"period is {obs.get('period')!r}, the published table is {doc['period']}")
+        for sector in ("commercial", "industrial"):
+            want = doc["rows"][area][sector]["current"]
+            have = (obs.get("sectors") or {}).get(sector)
+            if want is None:
+                if have is not None:
+                    bad.append(
+                        f"{area} {sector}: EIA publishes no figure but the product states {have!r}"
+                    )
+                continue
+            if not have or have.get("cents_per_kWh") != want:
+                bad.append(f"{area} {sector}: {have!r} is not the published {want} cents/kWh")
+            elif abs(have.get("usd_per_MWh", -1) - want * 10) > 0.06:
+                bad.append(
+                    f"{area} {sector}: usd_per_MWh {have.get('usd_per_MWh')!r} is not {want} cents/kWh x 10"
+                )
+        return bad
+
+    bad = figures(ctx, "U.S. Total")
+    src = ctx.get("source", {})
+    if src.get("page_sha256") != doc["provenance"]["page_sha256"]:
+        bad.append("the source page hash is not the one the harness parsed")
+    if src.get("release_date") != doc["release_date"]:
+        bad.append("the release date is not the one on the published page")
+    _check(
+        res,
+        "context.price_matches_independent_parse",
+        "the product's retail price statistic equals the harness's own parse of EIA's table",
+        bad,
+    )
+
+    text = " ".join(ctx.get("statements", []) + ctx.get("limits", []))
+    country = str((intake.get("site") or {}).get("country") or "").strip().upper()
+    expected_level = (
+        "same_country_context" if country in US_COUNTRY_NAMES else "scale_reference_only"
+    )
+    declared = (intake.get("economics") or {}).get("electricity_eur_per_MWh")
+    bad = []
+    if ctx.get("kind") != "context_only":
+        bad.append(f"kind is {ctx.get('kind')!r}, not context_only")
+    for phrase in ("not converted", "contracted tariff"):
+        if phrase not in text:
+            bad.append(f"the statements no longer say: {phrase}")
+    if len(ctx.get("limits", [])) < 4 or not any(
+        "evidence class" in m for m in ctx.get("limits", [])
+    ):
+        bad.append("the claims it refuses to make are missing or incomplete")
+    if ctx.get("applicability", {}).get("level") != expected_level:
+        bad.append(
+            f"applicability is {ctx.get('applicability', {}).get('level')!r} for country {country!r}; expected {expected_level}"
+        )
+    assumed = ctx.get("assumed") or {}
+    if assumed.get("evidence_class_unchanged") is not True:
+        bad.append("it does not state that the price's evidence class is unchanged")
+    if isinstance(declared, (int, float)) and not isinstance(declared, bool) and declared > 0:
+        if assumed.get("eur_per_MWh") != float(declared):
+            bad.append(
+                f"the declared tariff {declared} is reported back as {assumed.get('eur_per_MWh')!r}"
+            )
+    elif "placeholder" not in str(assumed.get("source", "")):
+        bad.append("no tariff was declared but the price is not labelled a placeholder")
+    if not any("retail_price_context" in c for c in compare.get("caveats", [])):
+        bad.append("the comparison's caveats do not label it context only")
+    _check(
+        res,
+        "context.price_limits_are_stated",
+        "it says what it is, what it is not, and that the currencies are not converted",
+        bad,
+    )
+
+    stated = api(
+        "compare",
+        {"intake": intake, "electricity_price_state": PRICE_STATE},
+        report_date=report_date,
+    )
+    bad = []
+    if not stated.get("ok"):
+        bad.append(f"a valid state was refused: {stated.get('message')}")
+    else:
+        out = stated["result"]
+        bad += figures(out.get("retail_price_context", {}), PRICE_STATE)
+        if _strip_context(out) != _strip_context(compare):
+            bad.append("asking for a state changed something other than the context block")
+    _check(
+        res,
+        "context.price_state_moves_nothing_else",
+        "a state request changes the context block and nothing else in the comparison",
         bad,
     )
     return res
@@ -542,6 +667,7 @@ def run(
         )
         rec.checks += evaluate_whatifs(intake, compare, api, report_date)
         rec.checks += evaluate_queue_context(intake, compare, api, report_date)
+        rec.checks += evaluate_price_context(intake, compare, api, report_date)
     except ProductUnavailable as exc:
         rec.checks.append(
             Check(

@@ -471,3 +471,125 @@ def test_a_refused_document_is_a_failure():
         return regional_api(out)(route, body, report_date)
 
     assert judged(out, refuse_doc)["context.document_matches"] == "FAIL"
+
+
+# --- the product's retail_price_context, judged against this harness's own parse of EIA's table -------------------------------------
+
+
+def price_block(area="U.S. Total", *, ind=None, com=None, **over) -> dict:
+    from gridforge_stress.paths import fixtures_dir
+    from gridforge_stress.price import load_price_context
+
+    doc = load_price_context(fixtures_dir() / "eia_retail_price_context.json")
+    row = doc["rows"][area]
+
+    def sector(name, forced):
+        c = forced if forced is not None else row[name]["current"]
+        return {"cents_per_kWh": c, "usd_per_MWh": round(c * 10, 1)}
+
+    block = {
+        "kind": "context_only",
+        "source": {
+            "page_sha256": doc["provenance"]["page_sha256"],
+            "release_date": doc["release_date"],
+        },
+        "observed": {
+            "area": area,
+            "period": doc["period"],
+            "sectors": {
+                "commercial": sector("commercial", com),
+                "industrial": sector("industrial", ind),
+            },
+        },
+        "applicability": {"level": "scale_reference_only"},
+        "assumed": {
+            "eur_per_MWh": 140.0,
+            "source": "library placeholder (evidence class E0); no contracted tariff supplied",
+            "evidence_class_unchanged": True,
+        },
+        "statements": [
+            "A load's price is set by its contracted tariff.",
+            "They are shown in their own currencies and are not converted.",
+        ],
+        "limits": ["a", "b", "c", "that the price is validated or changed in evidence class"],
+    }
+    block.update(over)
+    return block
+
+
+def with_price(**over) -> dict:
+    out = payload()
+    out["retail_price_context"] = price_block(**over)
+    out["caveats"] = [*out.get("caveats", []), "Context only: retail_price_context ..."]
+    return out
+
+
+def state_api(compare_out: dict, *, block=None, change=None):
+    def api(route, body, report_date="2026-10-27"):
+        out = copy.deepcopy(compare_out)
+        out["retail_price_context"] = block or price_block("Virginia")
+        if change:
+            change(out)
+        return {"ok": True, "result": out}
+
+    return api
+
+
+def judged_price(out: dict, api=None) -> dict[str, str]:
+    checks = W.evaluate_price_context(INTAKE, out, api or state_api(out), "2026-10-27")
+    return {c.id: c.outcome for c in checks}
+
+
+def test_a_product_without_the_price_block_is_not_judged_for_it():
+    assert W.evaluate_price_context(INTAKE, payload(), state_api(payload()), "2026-10-27") == []
+
+
+def test_a_faithful_copy_of_the_parse_passes_all_three_checks():
+    assert judged_price(with_price()) == {
+        "context.price_matches_independent_parse": "PASS",
+        "context.price_limits_are_stated": "PASS",
+        "context.price_state_moves_nothing_else": "PASS",
+    }
+
+
+def test_a_wrong_industrial_price_fails_the_figures_check_and_names_it():
+    out = with_price(ind=8.64)
+    checks = W.evaluate_price_context(INTAKE, out, state_api(out), "2026-10-27")
+    c = next(x for x in checks if x.id == "context.price_matches_independent_parse")
+    assert c.outcome == "FAIL" and "8.64" in c.detail and "9.64" in c.detail
+
+
+def test_a_wrong_conversion_fails():
+    out = with_price()
+    out["retail_price_context"]["observed"]["sectors"]["industrial"]["usd_per_MWh"] = 90.0
+    assert judged_price(out)["context.price_matches_independent_parse"] == "FAIL"
+
+
+def test_a_stale_or_foreign_source_fails():
+    out = with_price()
+    out["retail_price_context"]["source"]["page_sha256"] = "0" * 64
+    assert judged_price(out)["context.price_matches_independent_parse"] == "FAIL"
+    out = with_price()
+    out["retail_price_context"]["observed"]["period"] = "2026-07"
+    assert judged_price(out)["context.price_matches_independent_parse"] == "FAIL"
+
+
+def test_dropping_the_no_conversion_statement_fails_the_limits_check():
+    out = with_price(statements=["A load's price is set by its contracted tariff."])
+    assert judged_price(out)["context.price_limits_are_stated"] == "FAIL"
+
+
+def test_a_placeholder_not_labelled_as_one_fails():
+    out = with_price(
+        assumed={"eur_per_MWh": 140.0, "source": "from EIA", "evidence_class_unchanged": True}
+    )
+    assert judged_price(out)["context.price_limits_are_stated"] == "FAIL"
+
+
+def test_a_state_request_that_returns_other_figures_or_moves_something_fails():
+    out = with_price()
+    wrong = state_api(out, block=price_block("Texas"))
+    assert judged_price(out, wrong)["context.price_state_moves_nothing_else"] == "FAIL"
+    moved = state_api(out, change=lambda o: o.update(headline="changed"))
+    # the compare payload built by payload() carries no headline key; any added key is a movement
+    assert judged_price(out, moved)["context.price_state_moves_nothing_else"] == "FAIL"
