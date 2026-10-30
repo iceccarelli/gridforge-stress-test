@@ -1,0 +1,30 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "eia-epm",
+  "source_url": "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a",
+  "origin": "source_derived_fixture",
+  "retrieved_at": "2026-10-30T09:50:00Z",
+  "retrieval_status": "not_attempted",
+  "response_status": 200,
+  "sha256": "8536d613fe82422bbf188c7d6a93a63c5e9ec4de207b168e3ed9af08fdc79753",
+  "byte_count": 10521,
+  "record_count": 62,
+  "time_coverage": {
+    "period": "2026-08",
+    "prior_period": "2025-08"
+  },
+  "upstream_release": "EIA Electric Power Monthly, release of October 23, 2026 (page sha256 042269100ad9e52865ce21692337baa25ef0385e653189f51001ba348d7e3603)",
+  "units": {
+    "price": "US cents per kWh"
+  },
+  "transformations": [
+    "Table 5.6.A parsed by column heading; only the commercial and industrial columns are kept",
+    "unpublished cells (-- / NM) are stored as null, never as zero"
+  ],
+  "limitations": [
+    "SOURCE-DERIVED statistic: the average price paid by every customer in a sector and state for one month; includes delivery",
+    "not the tariff of any load, not a data-centre price, not a forecast",
+    "current-month values are preliminary per EIA"
+  ],
+  "attribution": "U.S. Energy Information Administration, Electric Power Monthly, Table 5.6.A (Form EIA-861M). EIA data are public; statistics extracted by the gridforge-stress harness."
+}

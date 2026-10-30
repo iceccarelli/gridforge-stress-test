@@ -53,6 +53,14 @@ def _content_check(path: Path) -> list[Finding]:
         except (BridgeError, KeyError, ValueError) as exc:
             return [Finding("bad_queue_context", str(exc))]
         return []
+    if name == "eia_retail_price_context.json":
+        from .price import PriceContextError, load_price_context
+
+        try:
+            load_price_context(path)
+        except (PriceContextError, KeyError, ValueError) as exc:
+            return [Finding("bad_price_context", str(exc))]
+        return []
     if name == "poi_synthetic.json":
         bad = [p for p in load_json(path)["pois"] if classify_poi(p)["is_allocation"]]
         return [Finding("poi_promoted", f"{p['name']} classified as allocation") for p in bad]

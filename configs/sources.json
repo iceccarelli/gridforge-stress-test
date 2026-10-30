@@ -383,6 +383,45 @@
       ],
       "max_bytes": 26214400,
       "probe_urls": []
+    },
+    {
+      "id": "eia-epm",
+      "name": "EIA Electric Power Monthly, Table 5.6.A (average retail price by state and sector)",
+      "owner": "U.S. Energy Information Administration",
+      "locator": "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a",
+      "allowed_hosts": [
+        "www.eia.gov"
+      ],
+      "access_status": "public",
+      "formats": [
+        "html"
+      ],
+      "acquisition_method": "http_download",
+      "release_identity": "Electric Power Monthly, monthly release (the page names its release date and the next one)",
+      "license_attribution": "UNVERIFIED",
+      "semantics": "Average price (revenue divided by sales) to ultimate customers by state and end-use sector for one month, from Form EIA-861M; includes delivery; current-month values preliminary, prior-year values final",
+      "units": "US cents per kWh",
+      "time_convention": "calendar month",
+      "geography": "US states, census divisions, US total",
+      "credential_env": [],
+      "limitations": [
+        "a sector-wide statistic, not the tariff of any load",
+        "single month: seasonal, preliminary for the latest month",
+        "licence wording not read on this page; EIA states its data are public"
+      ],
+      "verification": {
+        "status": "unverified",
+        "checked_on": "2026-10-30",
+        "basis": "The page body was read once by plain HTTP GET from the build sandbox (HTTP 200, 105,641 bytes, sha256 042269...e3603), which is how the fixture was made; that read did not go through the harness fetch path and is not a probe workflow run. Status stays unverified until the probe workflow reads it."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "text/html"
+      ],
+      "max_bytes": 2097152,
+      "probe_urls": [
+        "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"
+      ]
     }
   ]
 }
