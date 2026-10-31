@@ -1,0 +1,100 @@
+{
+  "schema": "gridforge-stress/site-pricing/1",
+  "source_id": "timetopower-site-llms",
+  "evidence_kind": "company_claim",
+  "definition": "What the company says it meters per call and sells as API plans. A claim to be checked against the engine, not evidence about the world.",
+  "provenance": {
+    "url": "https://timetopower.ai/llms.txt",
+    "retrieved_at": "2026-10-31T18:20:41Z",
+    "http_status": 200,
+    "bytes": 12364,
+    "sha256": "91a1a8d49024b42fd097678881bbd8a77d4372de4790f40cb08a35c4084a403e",
+    "retrieval": "one plain HTTP GET outside the harness fetch path; not a probe workflow run"
+  },
+  "weights": {
+    "/v1/qualify": {
+      "units": 0,
+      "per_hall": false,
+      "free": true
+    },
+    "/v1/estimate": {
+      "units": 0,
+      "per_hall": false,
+      "free": true
+    },
+    "/v1/screen": {
+      "units": 1,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/compare": {
+      "units": 1,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/study": {
+      "units": 5,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/portfolio": {
+      "units": 1,
+      "per_hall": true,
+      "free": false
+    },
+    "/v1/diff": {
+      "units": 2,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/spec": {
+      "units": 3,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/bids": {
+      "units": 2,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/power/assess": {
+      "units": 5,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/power/deploy/assess": {
+      "units": 5,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/power/deploy/spec": {
+      "units": 3,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/power/deploy/bids": {
+      "units": 2,
+      "per_hall": false,
+      "free": false
+    },
+    "/v1/proposal": {
+      "units": 2,
+      "per_hall": false,
+      "free": false
+    }
+  },
+  "plans": {
+    "Triage": {
+      "eur_per_month": 900,
+      "units_per_month": 600
+    },
+    "Scale": {
+      "eur_per_month": 2900,
+      "units_per_month": 2500
+    },
+    "Platform": {
+      "eur_per_month": 7500,
+      "units_per_month": 10000
+    }
+  }
+}

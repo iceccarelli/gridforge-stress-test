@@ -422,6 +422,46 @@
       "probe_urls": [
         "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"
       ]
+    },
+    {
+      "id": "timetopower-site-llms",
+      "name": "GridForge public machine-readable summary (llms.txt): the company's own published unit weights and API plans",
+      "owner": "GridForge AI (the company under test)",
+      "locator": "https://timetopower.ai/llms.txt",
+      "allowed_hosts": [
+        "timetopower.ai"
+      ],
+      "access_status": "public",
+      "formats": [
+        "txt"
+      ],
+      "acquisition_method": "http_download",
+      "release_identity": "none declared; identified by the page's SHA-256 and the retrieval time",
+      "license_attribution": "UNVERIFIED (the company's own public page; no licence statement read)",
+      "semantics": "A CLAIM by the company about what it meters per call and sells as API plans. It is what a buyer is told, to be checked against what the engine does; it is not evidence about the world.",
+      "units": "metered units per call; EUR per month and units per month for plans",
+      "time_convention": "the instant the page was read",
+      "geography": "not applicable",
+      "credential_env": [],
+      "limitations": [
+        "a claim, not a measurement: agreement with the engine shows consistency, not that the pricing is right",
+        "one reading: a later change to the site is not seen until the page is read again",
+        "states no pay-as-you-go price"
+      ],
+      "verification": {
+        "status": "unverified",
+        "checked_on": "2026-10-31",
+        "basis": "The page body was read once by plain HTTP GET from the build sandbox (HTTP 200, 12,364 bytes, sha256 91a1a8d49024b42f...a403e) to make the fixture; that read did not go through the harness fetch path and is not a probe workflow run. Status stays unverified until the probe workflow reads it."
+      },
+      "live_fetch": "disabled_until_verified",
+      "allowed_content_types": [
+        "text/plain",
+        "text/markdown"
+      ],
+      "max_bytes": 262144,
+      "probe_urls": [
+        "https://timetopower.ai/llms.txt"
+      ]
     }
   ]
 }

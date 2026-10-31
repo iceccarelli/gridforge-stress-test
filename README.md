@@ -4,9 +4,9 @@ Independent source-integrity and adversarial acceptance harness for GridForge-AI
 It validates external-data handling offline, records provenance, and checks that the real product never asserts
 more than its evidence supports.
 
-**Status:** foundation with first live evidence. Publisher pages for 7 of 10 sources have been read via the `probe` workflow;
+**Status:** foundation with first live evidence. Publisher pages for 7 of 11 sources have been read via the `probe` workflow;
 live fetch is disabled everywhere and no live dataset has gone through the harness fetch path (see [docs/data-sources.md](docs/data-sources.md)).
-One further page (`eia-epm`) was read once outside that path to build a source-derived fixture; it stays `unverified`.
+Two further pages (`eia-epm`, and the company's own `timetopower-site-llms`, a *claim* not evidence) were read once outside that path to build source-derived fixtures; both stay `unverified`.
 Licensed under the Apache License 2.0 (see [LICENSE](LICENSE)). Fixtures derived from third-party data keep that data's own licence and attribution (for example LBNL *Queued Up*, CC BY 4.0), which the fixture manifests record.
 
 ## Fast start

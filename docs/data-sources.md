@@ -18,6 +18,7 @@ read and which run read it; anything not shown stays `UNVERIFIED`.
 | openei-urdb | API key | yes | disabled | `api_key` required (free); docs page last modified 2017 |
 | nws-api | public | yes | disabled | User-Agent with contact required |
 | eia-epm | public | no (one plain GET outside the harness fetch path, 2026-10-30; not a probe run) | disabled | Electric Power Monthly Table 5.6.A (release of October 23, 2026) was parsed into the `eia_retail_price_context` fixture; licence UNVERIFIED, status stays `unverified` until a probe run reads it |
+| timetopower-site-llms | public | no (one plain GET outside the harness fetch path, 2026-10-31; not a probe run) | disabled | the company's own `llms.txt`: a CLAIM about unit weights and API plans, not evidence about the world; parsed into the `site_llms_pricing` fixture and compared with the real engine; licence UNVERIFIED |
 
 `live_fetch: enabled` is allowed only for a source whose publisher page was read AND with a tested reason; none is
 enabled. Reading a page is not the same as downloading or parsing its data. The only dataset read through the harness so far is the LBNL workbook, inspected

@@ -1,0 +1,30 @@
+{
+  "schema_version": "dataset-manifest/1",
+  "source_id": "timetopower-site-llms",
+  "source_url": "https://timetopower.ai/llms.txt",
+  "origin": "source_derived_fixture",
+  "retrieved_at": "2026-10-31T18:20:41Z",
+  "retrieval_status": "not_attempted",
+  "response_status": 200,
+  "sha256": "26ffc1a7c19af4c90277b359968f9201366b4b7c861ef53264960bf9cdc8edc7",
+  "byte_count": 2198,
+  "record_count": 17,
+  "time_coverage": {
+    "observed": "2026-10-31"
+  },
+  "upstream_release": "llms.txt as served 2026-10-31T18:20:41Z (page sha256 91a1a8d49024b42fd097678881bbd8a77d4372de4790f40cb08a35c4084a403e, 12364 bytes)",
+  "units": {
+    "weights": "metered units per call (portfolio: per hall)",
+    "plans": "EUR per month; units per month"
+  },
+  "transformations": [
+    "only the per-endpoint unit lines and the API plan lines are parsed; every other line is ignored",
+    "'free' is stored as 0 units; the raw page is not stored"
+  ],
+  "limitations": [
+    "a CLAIM by the company about what it meters and sells, not evidence about the world",
+    "one reading: a later change to the site is not reflected until the page is read again",
+    "the page does not state a pay-as-you-go price, so none is recorded"
+  ],
+  "attribution": "GridForge AI public page https://timetopower.ai/llms.txt; figures extracted by the gridforge-stress harness. The company's own published statement; no separate licence statement was read."
+}

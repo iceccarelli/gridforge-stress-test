@@ -131,7 +131,7 @@ def test_every_tool_is_listed_with_a_valid_strict_input_schema():
 def test_registry_tools_report_what_was_verified_honestly(server):
     rows = payload(call(server, "list_sources"))
     by = {r["id"]: r for r in rows}
-    assert len(rows) == 10 and by["ercot-data-portal"]["live_fetch"] == "blocked_until_authorized"
+    assert len(rows) == 11 and by["ercot-data-portal"]["live_fetch"] == "blocked_until_authorized"
     assert all(r["live_fetch"] != "enabled" for r in rows)
     src = payload(call(server, "get_source", {"source_id": "lbnl-queued-up"}))
     assert (
@@ -362,7 +362,7 @@ def test_real_subprocess_speaks_clean_json_rpc_over_stdio():
     parsed = [json.loads(x) for x in lines]  # every stdout line must be valid JSON
     assert [p["id"] for p in parsed] == [1, 2, 3, 4]
     assert len(parsed[1]["result"]["tools"]) == len(M.TOOLS)
-    assert len(json.loads(parsed[2]["result"]["content"][0]["text"])) == 10
+    assert len(json.loads(parsed[2]["result"]["content"][0]["text"])) == 11
     assert json.loads(parsed[3]["result"]["content"][0]["text"])["level"] == "context_only"
 
 
