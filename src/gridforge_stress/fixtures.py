@@ -5,13 +5,14 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from .findings import Finding, errors
 from .hourly import validate_hourly
 from .manifest import sha256_hex
 from .poi import classify_poi
 from .queue import LBNL_2026_MAP, ColumnMap, parse_rows
-from .registry import RegistryError, default_sources, load_json, validate_against
+from .registry import RegistryError, Source, default_sources, load_json, validate_against
 from .scenarios_data import validate_tariff
 
 QUEUE_MAP = ColumnMap(
@@ -66,14 +67,71 @@ def _content_check(path: Path) -> list[Finding]:
         return [Finding("poi_promoted", f"{p['name']} classified as allocation") for p in bad]
     if name == "tariff_synthetic.json":
         return validate_tariff(load_json(path))
+    if name.endswith("_intake.json"):
+        doc = load_json(path)
+        missing = [k for k in ("project", "grid", "compute") if k not in doc]
+        return (
+            [Finding("bad_intake_fixture", f"missing top-level keys {missing}")] if missing else []
+        )
     return [Finding("no_validator", f"no content validator registered for {name}")]
+
+
+def _source_derived_findings(
+    doc: dict[str, Any], sources: dict[str, Source], path: Path
+) -> list[Finding]:
+    """A source-derived fixture must carry what lets a reader trace and re-check it; a missing piece is an error, not a default."""
+    out: list[Finding] = []
+    name = path.name
+    if not doc["attribution"].strip():
+        out.append(
+            Finding("no_attribution", "source-derived fixture needs attribution", where=name)
+        )
+    for field in ("retrieved_at", "upstream_release"):
+        if not (doc.get(field) or "").strip():
+            out.append(
+                Finding(
+                    "incomplete_provenance", f"source-derived fixture needs {field}", where=name
+                )
+            )
+    for field in ("units", "transformations"):
+        if not doc.get(field):
+            out.append(
+                Finding(
+                    "incomplete_provenance", f"source-derived fixture needs {field}", where=name
+                )
+            )
+    src = sources.get(doc["source_id"])
+    if src is not None and src.raw["verification"]["status"] != "publisher_page_read":
+        out.append(
+            Finding(
+                "source_not_verified",
+                f"derived from {doc['source_id']}, whose registry verification is "
+                f"{src.raw['verification']['status']!r}: the fixture does not make the source verified",
+                severity="warning",
+                where=name,
+            )
+        )
+    if name == "eia_retail_price_context.json":
+        try:
+            sha = load_json(path)["provenance"]["page_sha256"]
+        except (KeyError, TypeError, ValueError):
+            sha = ""
+        if not sha or sha not in (doc.get("upstream_release") or ""):
+            out.append(
+                Finding(
+                    "provenance_mismatch",
+                    "page_sha256 in the fixture is not the one named in the manifest's upstream_release",
+                    where=name,
+                )
+            )
+    return out
 
 
 def validate_fixtures(root: Path) -> list[Finding]:
     out: list[Finding] = []
     sources = default_sources()
     data_files = sorted(
-        p for p in root.iterdir() if p.is_file() and not p.name.endswith(".manifest.json")
+        p for p in root.rglob("*") if p.is_file() and not p.name.endswith(".manifest.json")
     )
     if not data_files:
         return [Finding("no_fixtures", f"no fixtures in {root}")]
@@ -97,10 +155,8 @@ def validate_fixtures(root: Path) -> list[Finding]:
             out.append(
                 Finding("unlabelled_synthetic", "limitations must say SYNTHETIC", where=p.name)
             )
-        if doc["origin"] == "source_derived_fixture" and not doc["attribution"].strip():
-            out.append(
-                Finding("no_attribution", "source-derived fixture needs attribution", where=p.name)
-            )
+        if doc["origin"] == "source_derived_fixture":
+            out.extend(_source_derived_findings(doc, sources, p))
         if doc["origin"] == "live_fetch":
             out.append(
                 Finding(

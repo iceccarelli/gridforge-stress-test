@@ -1,0 +1,358 @@
+{
+  "schema_version": "gridforge-stress/problems/1",
+  "note": "Hypotheses until validated with customers. No market size, willingness to pay or savings is claimed; consequence_quantified is null by design. Evidence strength 'weak' means search-snippet or inference only; no publisher page was read for those items (sandbox network blocked).",
+  "problems": [
+    {
+      "id": "TTP-P001",
+      "title": "Generation-queue statistics mistaken for load-connection timelines",
+      "description": "Investors and developers may read generation interconnection queue completion/duration as the wait for a data-centre load connection. The two processes are different.",
+      "geography": "US (ISO/RTO queues)",
+      "customer_segment": "Data-centre developers; lenders",
+      "buyer": "Site-selection lead; investment committee",
+      "decision_blocked": "Whether a campus MW commitment and power date is defensible",
+      "consequence": "Capital and land committed against a power date the evidence does not support",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "moderate",
+        "statements": [
+          {
+            "kind": "observed_fact",
+            "text": "Registry rule 6 and scenario GF-002 already forbid presenting queue stats as load-connection probabilities.",
+            "ref": "CLAUDE.md; configs/scenarios.json#GF-002"
+          },
+          {
+            "kind": "finding",
+            "text": "LBNL Queued Up covers generation and storage requests, per the registry entry; not load.",
+            "ref": "configs/sources.json#lbnl-queued-up"
+          },
+          {
+            "kind": "hypothesis",
+            "text": "The product's grid-wait assumption can be misread as queue-derived.",
+            "ref": "tests/integration/test_context_bridge_product.py"
+          }
+        ]
+      },
+      "source_ids": [
+        "lbnl-queued-up"
+      ],
+      "unregistered_candidate_sources": [],
+      "unknown": [
+        "Whether any large-load queue dataset is public per utility"
+      ],
+      "current_alternatives": [
+        "Utility conversations",
+        "Consultant studies"
+      ],
+      "potential_gridforge_solution": "Show observed queue history beside the product's assumption, labelled context only (context_bridge exists)",
+      "response_type": "software",
+      "success_metric": "Share of reports where queue context is labelled non-load",
+      "acceptance_criteria": "Product never states a load-connection probability from queue stats",
+      "monetization_hypothesis": "Software qualifier plus paid engagement (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "context_bridge",
+        "workflow.queue"
+      ]
+    },
+    {
+      "id": "TTP-P002",
+      "title": "Firm versus non-firm or curtailable grid capacity hidden in a single grid-wait number",
+      "description": "A connection may be offered as non-firm or conditional on on-site generation/storage, which changes the usable capacity and the bridge-power need.",
+      "geography": "Ireland (reported); other regions unknown",
+      "customer_segment": "Data-centre operators",
+      "buyer": "Developer; operator CFO",
+      "decision_blocked": "Whether to rely on grid capacity or size bridge power",
+      "consequence": "Under-sized bridge power or overstated usable MW",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "weak",
+        "statements": [
+          {
+            "kind": "search_snippet_unverified",
+            "text": "Search summaries of law-firm commentary describe CRU Ireland large-energy-user connection policy with dispatchable on-site generation requirements; no CRU page was read.",
+            "ref": "unregistered: cru.ie"
+          },
+          {
+            "kind": "hypothesis",
+            "text": "Product may model contracted power without a firm/non-firm flag.",
+            "ref": "audit: workflow.py firm_capacity_factor defaults to 1.0"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [
+        "cru-ie-leu-connection-policy (not read)"
+      ],
+      "unknown": [
+        "Exact CRU decision text and thresholds",
+        "Equivalent rules in other jurisdictions"
+      ],
+      "current_alternatives": [
+        "Utility correspondence"
+      ],
+      "potential_gridforge_solution": "Independent oracle: contracted vs firm supply; flag when firm capacity is unspecified",
+      "response_type": "software",
+      "success_metric": "Share of reports stating firm vs contracted explicitly",
+      "acceptance_criteria": "A dated result is never produced from contracted MW alone without a firm-capacity statement",
+      "monetization_hypothesis": "Engineering review service (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "oracle.contracted_vs_firm"
+      ]
+    },
+    {
+      "id": "TTP-P003",
+      "title": "Large-load process change while a request is pending",
+      "description": "ERCOT batch study, FERC large-load rulemaking and state tariffs are changing; a timeline can go stale.",
+      "geography": "US (ERCOT, FERC, states)",
+      "customer_segment": "Developers; portfolio managers",
+      "buyer": "Portfolio manager",
+      "decision_blocked": "Whether a pending request keeps its timeline",
+      "consequence": "Stale schedule on a live project",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "weak",
+        "statements": [
+          {
+            "kind": "search_snippet_unverified",
+            "text": "Search summaries mention an ERCOT Batch Zero framework and FERC docket RM26-4; neither publisher page was read and status is unverified.",
+            "ref": "unregistered: ercot.com, ferc.gov"
+          }
+        ]
+      },
+      "source_ids": [
+        "ercot-data-portal"
+      ],
+      "unregistered_candidate_sources": [
+        "ferc-rm26-4 (not read)",
+        "ercot-large-load-batch (not read)"
+      ],
+      "unknown": [
+        "Current status of each process"
+      ],
+      "current_alternatives": [
+        "Regulatory counsel",
+        "Trade press"
+      ],
+      "potential_gridforge_solution": "Dated evidence records with an as-of date and expiry",
+      "response_type": "software",
+      "success_metric": "Share of evidence items carrying as-of dates",
+      "acceptance_criteria": "Every regulatory input carries a retrieval date and is flagged when stale",
+      "monetization_hypothesis": "Monitoring subscription (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "evidence.freshness"
+      ]
+    },
+    {
+      "id": "TTP-P004",
+      "title": "Transformer and other long-lead equipment critical path missing from schedule",
+      "description": "Large power transformers have multi-year lead times in public reports; a power date that ignores equipment arrival is unachievable.",
+      "geography": "US-led; global",
+      "customer_segment": "Developers; EPC",
+      "buyer": "Procurement lead",
+      "decision_blocked": "Whether an energisation date can be met",
+      "consequence": "Energisation date earlier than equipment can arrive",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "moderate",
+        "statements": [
+          {
+            "kind": "observed_fact",
+            "text": "The harness workflow already checks that a missing transformer lead time is not silently dated.",
+            "ref": "src/gridforge_stress/workflow.py (evaluate_whatifs)"
+          },
+          {
+            "kind": "search_snippet_unverified",
+            "text": "Search summaries attribute a ~128-week average power-transformer lead time to Wood Mackenzie (Q2 2025); the page was not read and the full report is paywalled.",
+            "ref": "unregistered: woodmac.com"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [
+        "doe-lpt-resilience-2024 (not read)",
+        "woodmac-transformer-deficit-2025 (not read)"
+      ],
+      "unknown": [
+        "Lead times by MVA/kV class",
+        "Switchgear/UPS/cooling lead times (no public data found)"
+      ],
+      "current_alternatives": [
+        "OEM quotes",
+        "Consultants"
+      ],
+      "potential_gridforge_solution": "Independent critical-path oracle recomputed from intake lead times",
+      "response_type": "software",
+      "success_metric": "Critical-path items match independent recomputation",
+      "acceptance_criteria": "Date range is never shorter than the longest supplied lead time; missing lead time yields no date",
+      "monetization_hypothesis": "Procurement risk engagement (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "oracle.critical_path"
+      ]
+    },
+    {
+      "id": "TTP-P005",
+      "title": "Slot reservations and market estimates read as delivery commitments",
+      "description": "OEM disclosures distinguish firm backlog from slot reservations; a dated market estimate is not a supplier quote.",
+      "geography": "Global",
+      "customer_segment": "Developers choosing behind-the-meter gas",
+      "buyer": "Developer; lender",
+      "decision_blocked": "Whether bridge power can be delivered by a date",
+      "consequence": "False confidence in a bridge-power option",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "weak",
+        "statements": [
+          {
+            "kind": "search_snippet_unverified",
+            "text": "A search summary of a GE Vernova 8-K reports firm backlog and slot reservations separately; the filing was not read.",
+            "ref": "unregistered: sec.gov"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [
+        "ge-vernova-8k-3q26 (not read)"
+      ],
+      "unknown": [
+        "Delivery dates for specific frames"
+      ],
+      "current_alternatives": [
+        "OEM sales conversations"
+      ],
+      "potential_gridforge_solution": "Evidence classes that separate quote, disclosure, estimate",
+      "response_type": "software",
+      "success_metric": "Evidence class stated per lead-time input",
+      "acceptance_criteria": "No output presents an estimate as a quote",
+      "monetization_hypothesis": "Evidence-pack service (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "evidence.class"
+      ]
+    },
+    {
+      "id": "TTP-P006",
+      "title": "MW versus MVA and power-factor slips in grid capacity statements",
+      "description": "Utility capacity quoted in MVA is mistaken for MW, overstating usable power.",
+      "geography": "Global",
+      "customer_segment": "Data-centre operators",
+      "buyer": "Electrical engineer",
+      "decision_blocked": "How many racks a connection supports",
+      "consequence": "Overstated capacity",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "moderate",
+        "statements": [
+          {
+            "kind": "observed_fact",
+            "text": "Harness already tests a power-factor case; audit found no dedicated MVA-vs-MW oracle in workflow.py.",
+            "ref": "tests/integration/test_product_adversarial.py"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [],
+      "unknown": [
+        "Prevalence in real utility documents"
+      ],
+      "current_alternatives": [
+        "Manual engineering review"
+      ],
+      "potential_gridforge_solution": "Independent supply ceiling min(MVA*pf, contracted MW) - peak",
+      "response_type": "software",
+      "success_metric": "Oracle agrees with intake-derived bound",
+      "acceptance_criteria": "Racks never exceed the intake-derived ceiling",
+      "monetization_hypothesis": "Qualifier (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "workflow.supply_bound"
+      ]
+    },
+    {
+      "id": "TTP-P007",
+      "title": "BESS power versus energy and duration conflated",
+      "description": "A BESS rated in MW is credited as firm capacity without checking MWh against required ride-through hours.",
+      "geography": "Global",
+      "customer_segment": "BTM developers",
+      "buyer": "Developer",
+      "decision_blocked": "How much firm capacity a BESS provides",
+      "consequence": "Overstated firm capacity",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "weak",
+        "statements": [
+          {
+            "kind": "hypothesis",
+            "text": "Audit found no BESS energy-vs-power oracle; product behaviour untested.",
+            "ref": "audit"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [],
+      "unknown": [
+        "Product behaviour"
+      ],
+      "current_alternatives": [
+        "Vendor sizing tools"
+      ],
+      "potential_gridforge_solution": "Oracle: firm credit <= min(MW, MWh / hours)",
+      "response_type": "software",
+      "success_metric": "Credit bound holds under MWh cuts",
+      "acceptance_criteria": "Reducing MWh never increases credited capacity",
+      "monetization_hypothesis": "Sizing check (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "oracle.bess_energy"
+      ]
+    },
+    {
+      "id": "TTP-P008",
+      "title": "Malformed intake crashes document routes instead of being refused",
+      "description": "A non-object intake.project escapes as an internal error on deck, proposal, spec and bids, so a customer gets a server error and no deliverable.",
+      "geography": "Product (all)",
+      "customer_segment": "Any customer submitting an intake",
+      "buyer": "Product owner",
+      "decision_blocked": "Whether a malformed intake is refused safely",
+      "consequence": "Unhandled server faults on paid deliverable routes",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "strong",
+        "statements": [
+          {
+            "kind": "observed_fact",
+            "text": "Reproduced 2026-10-30 at product 8bbcdf7: 22 malformed project shapes fault on each of deck, proposal, spec, bids (88 faults).",
+            "ref": "tests/integration/test_product_intake_project_shape.py"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [],
+      "unknown": [
+        "Whether HTTP layer converts these to 500"
+      ],
+      "current_alternatives": [
+        "None"
+      ],
+      "potential_gridforge_solution": "Fix in product (company-owned)",
+      "response_type": "software",
+      "success_metric": "Zero faults in regression",
+      "acceptance_criteria": "All shapes refused safely; valid examples unchanged",
+      "monetization_hypothesis": "n/a (defect)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-30",
+      "harness_checks": [
+        "test_product_intake_project_shape"
+      ]
+    }
+  ]
+}

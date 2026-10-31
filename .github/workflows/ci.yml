@@ -41,7 +41,12 @@ jobs:
           python - <<'PY'
           import glob, zipfile
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
-          for need in ("_data/configs/sources.json", "_data/schemas/source.schema.json"):
+          for need in (
+              "_data/configs/sources.json",
+              "_data/schemas/source.schema.json",
+              "_data/configs/problems.json",
+              "_data/schemas/problem.schema.json",
+          ):
               assert any(n.endswith(need) for n in names), need
           PY
       - name: twine check (the metadata renders on PyPI)

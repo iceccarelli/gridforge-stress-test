@@ -281,3 +281,32 @@ def test_the_cli_passes_its_options_to_the_run(monkeypatch):
     monkeypatch.setattr(fuzz, "run_fuzz", spy)
     assert cli.main(["fuzz", "--sample", "5", "--seed", "99", "--slow", "0.5"]) == 0
     assert seen["seed"] == 99 and seen["slow_s"] == 0.5 and seen["sample"] == {5}
+
+
+def test_every_direct_child_of_every_intake_is_always_fuzzed_whatever_the_sample():
+    """Regression for the hole behind the 29 deck faults: intake.project was sampled out. Needs no product."""
+    import random
+
+    from gridforge_stress import _fuzz_runner as R
+    from gridforge_stress.fuzz import default_plans, reference_intake
+
+    intake = reference_intake()
+    for plan in default_plans(intake, sample_intake_paths=0):
+        roots = R.intake_roots(plan["base"])
+        for seed in (1, 7, 99):
+            chosen = set(R.choose_paths(plan["base"], plan["intake_keys"], 3, random.Random(seed)))
+            for root in roots:
+                for key in intake:
+                    assert (*root, key) in chosen, (plan["name"], root, key, seed)
+
+
+def test_intake_roots_are_found_by_shape_in_every_nesting_the_routes_use():
+    from gridforge_stress import _fuzz_runner as R
+    from gridforge_stress.fuzz import default_plans, reference_intake
+
+    found = {p["name"]: R.intake_roots(p["base"]) for p in default_plans(reference_intake())}
+    assert found["screen"] == [("intake",)]
+    assert found["portfolio"] == [("intakes", 0), ("intakes", 1)]
+    assert found["estimate"] == [("body", "intake")]
+    assert found["diff"] == [("before",), ("after",)]
+    assert found["qualify"] == [] and found["power_deploy_assess"] == []

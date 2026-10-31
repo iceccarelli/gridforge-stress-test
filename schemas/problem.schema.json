@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gridforge-stress/problems/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "note",
+    "problems"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gridforge-stress/problems/1"
+    },
+    "note": {
+      "type": "string"
+    },
+    "problems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "description",
+          "geography",
+          "customer_segment",
+          "buyer",
+          "decision_blocked",
+          "consequence",
+          "consequence_quantified",
+          "evidence",
+          "source_ids",
+          "unregistered_candidate_sources",
+          "unknown",
+          "current_alternatives",
+          "potential_gridforge_solution",
+          "response_type",
+          "success_metric",
+          "acceptance_criteria",
+          "monetization_hypothesis",
+          "validation_status",
+          "last_researched",
+          "harness_checks"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TTP-P[0-9]{3}$"
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "strength",
+              "statements"
+            ],
+            "properties": {
+              "strength": {
+                "enum": [
+                  "strong",
+                  "moderate",
+                  "weak"
+                ]
+              },
+              "statements": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "text",
+                    "ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "observed_fact",
+                        "finding",
+                        "search_snippet_unverified",
+                        "hypothesis"
+                      ]
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ref": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consequence_quantified": {
+            "type": "null"
+          },
+          "response_type": {
+            "enum": [
+              "software",
+              "professional_services",
+              "physical_delivery"
+            ]
+          },
+          "validation_status": {
+            "enum": [
+              "hypothesis_unvalidated_with_customers",
+              "validated_with_customers"
+            ]
+          },
+          "last_researched": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unregistered_candidate_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknown": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "current_alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "harness_checks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "geography": {
+            "type": "string",
+            "minLength": 1
+          },
+          "customer_segment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "buyer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision_blocked": {
+            "type": "string",
+            "minLength": 1
+          },
+          "consequence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "potential_gridforge_solution": {
+            "type": "string",
+            "minLength": 1
+          },
+          "success_metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acceptance_criteria": {
+            "type": "string",
+            "minLength": 1
+          },
+          "monetization_hypothesis": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

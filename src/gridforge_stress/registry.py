@@ -127,3 +127,19 @@ def load_scenarios(path: Path | None = None) -> list[dict[str, Any]]:
 @lru_cache(maxsize=1)
 def default_sources() -> dict[str, Source]:
     return load_sources()
+
+
+def load_problems() -> list[dict[str, Any]]:
+    """The market problem register. Schema-validated; every entry is a hypothesis until a customer validates it."""
+    doc = load_json(configs_dir() / "problems.json")
+    validate_against("problem", doc)
+    problems: list[dict[str, Any]] = doc["problems"]
+    ids = [p["id"] for p in problems]
+    if len(ids) != len(set(ids)):
+        raise RegistryError("duplicate problem ids")
+    known = {s["id"] for s in load_json(configs_dir() / "sources.json")["sources"]}
+    for p in problems:
+        unknown = set(p["source_ids"]) - known
+        if unknown:
+            raise RegistryError(f"{p['id']}: unregistered source ids {sorted(unknown)}")
+    return problems
