@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       product_ref:
-        description: GridForge-AI branch, tag or FULL commit SHA to test against (a short SHA failed to check out in run 40660996540)
+        description: GridForge-AI FULL 40-character commit SHA to test against. A branch or tag is refused because it is not a product identity
         required: true
 
 permissions:
@@ -19,6 +19,14 @@ jobs:
   product:
     runs-on: ubuntu-latest
     steps:
+      - name: Refuse anything but a full commit SHA
+        env:
+          PRODUCT_REF: ${{ inputs.product_ref }}
+        run: |
+          if ! printf '%s' "$PRODUCT_REF" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "product_ref must be a full 40-character lowercase commit SHA, got: $PRODUCT_REF" >&2
+            exit 1
+          fi
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
@@ -26,8 +34,13 @@ jobs:
           ref: ${{ inputs.product_ref }}
           path: GridForge-AI
           persist-credentials: false
-      - name: Show exactly which product commit is under test
-        run: git -C GridForge-AI log -1 --format='product %H (%s)'
+      - name: Show exactly which commits are under test, and refuse a mismatch
+        env:
+          PRODUCT_REF: ${{ inputs.product_ref }}
+        run: |
+          git log -1 --format='harness %H (%s)'
+          git -C GridForge-AI log -1 --format='product %H (%s)'
+          test "$(git -C GridForge-AI rev-parse HEAD)" = "$PRODUCT_REF"
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --locked --all-groups
       - run: uv run --locked pytest -m product -ra

@@ -59,3 +59,18 @@ def test_ci_runs_the_installed_wheel_not_only_the_source_tree():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
     assert "twine check --strict" in ci, "the built metadata is checked the way PyPI will read it"
     assert "site-packages" in ci and 'gridforge-stress" validate-fixtures' in ci
+
+
+def test_product_integration_accepts_only_a_full_commit_sha_and_checks_what_it_got():
+    wf = (ROOT / ".github" / "workflows" / "product-integration.yml").read_text()
+    assert "[0-9a-f]{40}" in wf, "a branch or tag is not a product identity"
+    assert 'test "$(git -C GridForge-AI rev-parse HEAD)" = "$PRODUCT_REF"' in wf
+    uses = [ln.strip() for ln in wf.splitlines() if "${{ inputs." in ln]
+    assert all(ln.startswith(("PRODUCT_REF:", "ref:")) for ln in uses), (
+        uses
+    )  # never interpolated into a shell script
+
+
+def test_ci_asserts_the_problem_register_is_in_the_wheel():
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    assert "_data/configs/problems.json" in ci and "_data/schemas/problem.schema.json" in ci
