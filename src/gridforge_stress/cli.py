@@ -19,6 +19,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("doctor", help="environment, registry, fixtures, product checkout, credentials")
     s = sub.add_parser("sources", help="source registry").add_subparsers(dest="sub", required=True)
     s.add_parser("list")
+    s.add_parser(
+        "lifecycle", help="the highest lifecycle state each source's recorded evidence supports"
+    )
     sc = sub.add_parser("scenarios", help="scenario catalogue").add_subparsers(
         dest="sub", required=True
     )
@@ -89,6 +92,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[{c['status']:>6}] {c['check']}: {c['detail']}")
         print("HEALTHY" if rep["healthy"] else "UNHEALTHY")
         return 0 if rep["healthy"] else 1
+    if ns.cmd == "sources" and ns.sub == "lifecycle":
+        from .lifecycle import lifecycle_report
+        from .registry import load_json
+
+        manifests = [load_json(p) for p in sorted(fixtures_dir().rglob("*.manifest.json"))]
+        for r in lifecycle_report(load_sources(), manifests):
+            print(f"{r.source_id:24} {r.state.name:24} {' '.join(r.flags)}")
+        return 0
     if ns.cmd == "sources":
         for src in load_sources().values():
             v = src.raw["verification"]["status"]

@@ -180,6 +180,68 @@
             "type": "string",
             "pattern": "^https://"
           }
+        },
+        "data_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "confirmed_on",
+            "url",
+            "http_status",
+            "bytes",
+            "evidence"
+          ],
+          "description": "Evidence that a DATASET (not the publisher page) answered: set only from a recorded probe or fetch, never by hand.",
+          "properties": {
+            "confirmed_on": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https://"
+            },
+            "http_status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "oracle_ready": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "parser",
+            "tests",
+            "confirmed_on"
+          ],
+          "description": "A parser and the tests that reject its corrupted input exist for a validated source-derived fixture.",
+          "properties": {
+            "parser": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tests": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "confirmed_on": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            }
+          }
         }
       }
     }

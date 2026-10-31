@@ -13,7 +13,7 @@ Time-to-Power product. It is NOT a second implementation of the product.
 ## Commands (all tested)
 `uv sync --locked --all-groups` · `uv run --locked ruff check .` · `ruff format --check .` · `mypy src` ·
 `pytest` (offline; excludes `product` and `live`) · `pytest -m product` (needs `GRIDFORGE_PRODUCT_DIR`) ·
-`gridforge-stress doctor|sources list|scenarios list|validate-fixtures`.
+`gridforge-stress doctor|sources list|sources lifecycle|scenarios list|validate-fixtures` (`sources lifecycle` shows the highest state each source's recorded evidence supports; a claim without its evidence never raises it).
 `gridforge-stress bridge <intake.json>` sets the product's grid-wait assumption beside observed queue history (context only).
 `gridforge-stress workflow <intake.json> [-o record.json]` runs the end-to-end journey on the real product and judges it (PASS/FAIL/BLOCKED/UNCHECKED; exit 0 only if all pass).
 `gridforge-stress mcp` serves the harness as an MCP server over stdio (see README; `.mcp.json`).
