@@ -9,6 +9,7 @@ import pytest
 from gridforge_stress.fuzz import reference_intake
 from gridforge_stress.oracles import (
     Unsupported,
+    bess_bound_violations,
     check_screen,
     effective_units,
     expected_headroom_kw,
@@ -216,3 +217,42 @@ def test_negative_headroom_text_is_read_with_either_minus(minus):
     c = _con(s, "transformer_capacity")
     c.update(basis=f"{minus}3,040 kW (E3) usable", racks_permitted=0)
     assert not [p for p in check_screen(d, s) if "transformer_capacity" in p]
+
+
+# --- BESS bounds: MW is not MWh -------------------------------------------------------------------------------------------------
+def bess(**over):
+    base = dict(
+        grid_firm_mw=8.0, power_mw=2.0, energy_mwh=8.0, ride_through_h=4.0, available_mw=9.5
+    )
+    return bess_bound_violations(**{**base, **over})
+
+
+def test_a_physically_possible_answer_has_no_violation():
+    assert bess() == []
+    assert bess(available_mw=8.0) == []  # too conservative is allowed: the bound is an upper bound
+    assert (
+        bess(ride_through_h=0.5, available_mw=10.0) == []
+    )  # full power for half an hour: 2 MW x 0.5 h = 1 MWh <= 8
+
+
+@pytest.mark.parametrize(
+    "name,over",
+    [
+        ("battery_reduces_grid", dict(available_mw=7.0)),
+        ("exceeds_power_rating", dict(ride_through_h=0.5, available_mw=10.5)),
+        (
+            "ignores_energy_at_long_duration",
+            dict(ride_through_h=24.0, available_mw=10.0),
+        ),  # 2 MW x 24 h = 48 MWh > 8
+        (
+            "ignores_a_tiny_battery",
+            dict(power_mw=20.0, energy_mwh=1.0, ride_through_h=4.0, available_mw=28.0),
+        ),  # 20 MW x 4 h = 80 MWh
+        (
+            "mw_read_as_mwh",
+            dict(power_mw=2.0, energy_mwh=2.0, ride_through_h=4.0, available_mw=10.0),
+        ),  # needs 8 MWh, holds 2
+    ],
+)
+def test_the_bess_oracle_catches_each_wrong_answer(name, over):
+    assert bess(**over), name
