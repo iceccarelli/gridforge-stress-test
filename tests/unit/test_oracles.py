@@ -13,6 +13,7 @@ from gridforge_stress.oracles import (
     check_screen,
     effective_units,
     expected_headroom_kw,
+    printed_tolerance_kw,
     racks_for,
 )
 
@@ -256,3 +257,28 @@ def test_a_physically_possible_answer_has_no_violation():
 )
 def test_the_bess_oracle_catches_each_wrong_answer(name, over):
     assert bess(**over), name
+
+
+@pytest.mark.parametrize(
+    "expected,printed,ok",
+    [
+        (1330.0, 1330.0, True),
+        (10261.0, 10300.0, True),  # 3 significant figures of 10,261
+        (10261.0, 10200.0, False),  # a whole hundred away: not rounding
+        (-10929.7, -10900.0, True),
+        (-10929.7, -11000.0, False),
+        (-3035.0, -3040.0, True),  # half-way case: either neighbour is a correct rounding
+        (-3035.0, -3030.0, True),
+        (45.4, 45.0, True),
+        (45.4, 47.0, False),
+        (0.0, 0.0, True),
+        (0.0, 3.0, False),
+    ],
+)
+def test_the_printed_tolerance_is_exactly_the_rounding_the_product_applies(expected, printed, ok):
+    assert (abs(printed - expected) <= printed_tolerance_kw(expected)) is ok
+
+
+def test_an_off_by_one_unit_error_is_hundreds_of_times_the_tolerance():
+    """The loosening must not hide a real engineering error: one transformer unit is ~4,365 kW against a 5 kW tolerance at 1,330 kW."""
+    assert 4365.0 / printed_tolerance_kw(1330.0) > 400
