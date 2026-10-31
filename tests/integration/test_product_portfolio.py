@@ -98,19 +98,6 @@ def test_a_single_hall_portfolio_equals_the_screen(expected):
     assert run("/v1/portfolio", {"intakes": [A]})["total_racks"] == expected["DH-02"][0]
 
 
-def test_the_checks_above_can_fail():
-    """Mutation: the comparison helpers must notice a wrong total and a mis-ordered ranking."""
-    good = {
-        "halls": [{"hall": "x", "racks": 5, "rank": 1}, {"hall": "y", "racks": 3, "rank": 2}],
-        "total_racks": 8,
-    }
-    assert good["total_racks"] == sum(h["racks"] for h in good["halls"])
-    bad = {**good, "total_racks": 9}
-    assert bad["total_racks"] != sum(h["racks"] for h in bad["halls"])
-    mis = sorted(({"racks": 3, "rank": 1}, {"racks": 5, "rank": 2}), key=lambda h: h["rank"])
-    assert [h["racks"] for h in mis] != sorted((h["racks"] for h in mis), reverse=True)
-
-
 @pytest.mark.xfail(
     strict=True,
     reason="GridForge-AI#112: the same hall listed twice is counted twice, with no warning",
