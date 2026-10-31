@@ -24,8 +24,10 @@ import re
 from typing import Any
 
 REDUNDANCY = ("N", "N+1", "N+2", "2N")
-#: Product text rounds headroom to 10 kW.
-HEADROOM_TOLERANCE_KW = 10.0
+#: The product prints headroom to three significant figures ("1,330", "10,300"). A printed value is therefore correct when it lies within half a
+#: unit of the third figure of the independent value, and no looser: an off-by-one-transformer error is hundreds of times larger.
+PRINTED_SIGNIFICANT_FIGURES = 3
+HEADROOM_FLOOR_TOLERANCE_KW = 0.5
 #: A rack outside this band is not a believable AI rack; if the product declares one the arithmetic check is moot.
 RACK_KW_BAND = (30.0, 400.0)
 PUE_BAND = (1.0, 2.5)
@@ -91,6 +93,14 @@ def expected_headroom_kw(intake: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def printed_tolerance_kw(expected_kw: float) -> float:
+    """Largest error a correct value can show after being printed to three significant figures (half a unit of the third figure)."""
+    unit = 10.0 ** (
+        math.floor(math.log10(max(abs(expected_kw), 1.0))) - (PRINTED_SIGNIFICANT_FIGURES - 1)
+    )
+    return max(0.5 * unit, HEADROOM_FLOOR_TOLERANCE_KW) + 1e-9
+
+
 def racks_for(headroom_kw: float, per_rack_kw: float) -> int:
     return 0 if headroom_kw <= 0 else math.floor(headroom_kw / per_rack_kw)
 
@@ -146,7 +156,7 @@ def check_screen(intake: dict[str, Any], screen: dict[str, Any]) -> list[str]:
             shown = _leading_kw(str(c.get("basis", "")))
             if shown is None:
                 problems.append(f"{sid}.{cid}: no headroom in text {c.get('basis')!r}")
-            elif abs(shown - expected[cid]) > HEADROOM_TOLERANCE_KW:
+            elif abs(shown - expected[cid]) > printed_tolerance_kw(expected[cid]):
                 problems.append(
                     f"{sid}.{cid}: product headroom {shown:g} kW, independent {expected[cid]:g} kW"
                 )
