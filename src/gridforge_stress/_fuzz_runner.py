@@ -121,25 +121,42 @@ def intake_roots(node: Any, prefix: tuple[Any, ...] = ()) -> list[tuple[Any, ...
     return out
 
 
-def choose_paths(
-    base: Any, intake_keys: list[str], sample: int, rng: random.Random
-) -> list[tuple[Any, ...]]:
-    """All paths outside the intake subtrees, every direct child of each intake document, plus a seeded sample of the deeper paths inside them.
+#: Replacing a whole intake block tests type confusion, so one value per type class is enough; the full catalogue still goes to the loader plan
+#: and to the sampled deeper paths. (The 22 shapes behind the /v1/deck faults were None, bool, str, int, float, NaN/inf, list, nested list.)
+BLOCK_VALUE_NAMES = (
+    "None", "True", "x", "empty_str", "one", "neg_one", "10**400", "1e308", "nan", "inf",
+    "empty_list", "empty_dict", "list_of_None",
+)  # fmt: skip
 
-    Without the direct children, a sample of a dozen from ~110 paths drew about one of an intake's twelve top-level blocks per route, so a hostile
-    `intake.project` (the cause of 29 faults on /v1/deck) was never reached."""
-    roots = {r for r in intake_roots(base)}
+
+def split_paths(
+    base: Any, intake_keys: list[str], sample: int, rng: random.Random
+) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+    """(paths that get the full hostile catalogue, intake blocks that get one value per type class).
+
+    The full set: everything outside the intake documents plus a seeded sample of their deeper paths. The blocks: every direct child of every
+    intake document, always. Without them a sample of a dozen from ~110 paths drew about one of an intake's twelve top-level blocks per route,
+    so a hostile `intake.project` (the cause of 29 faults on /v1/deck) was never reached."""
+    roots = set(intake_roots(base))
     outside: list[tuple[Any, ...]] = []
     inside: list[tuple[Any, ...]] = []
+    blocks: list[tuple[Any, ...]] = []
     for path in leaf_paths(base):
         # replacing a whole top-level key (e.g. "intake") is cheap and always worth trying; only the paths inside it are sampled
-        if len(path) > 1 and path[0] in intake_keys and path[:-1] not in roots:
-            inside.append(path)
+        if len(path) > 1 and path[0] in intake_keys:
+            (blocks if path[:-1] in roots else inside).append(path)
         else:
             outside.append(path)
     if sample < len(inside):
         inside = sorted(rng.sample(inside, sample), key=lambda p: [str(x) for x in p])
-    return outside + inside
+    return outside + inside, blocks
+
+
+def choose_paths(
+    base: Any, intake_keys: list[str], sample: int, rng: random.Random
+) -> list[tuple[Any, ...]]:
+    full, blocks = split_paths(base, intake_keys, sample, rng)
+    return full + blocks
 
 
 class Classifier:
@@ -214,11 +231,12 @@ def run(spec: dict[str, Any]) -> dict[str, Any]:
     for plan in spec["plans"]:
         before = cls.counts["calls"]
         base = plan["base"]
-        paths = choose_paths(
+        full, blocks = split_paths(
             base, plan.get("intake_keys", []), int(plan.get("sample_intake_paths", 40)), rng
         )
-        for path in paths:
-            for name, value in hostile:
+        block_values = [(n, v) for n, v in hostile if n in BLOCK_VALUE_NAMES]
+        for path, values in [(p, hostile) for p in full] + [(p, block_values) for p in blocks]:
+            for name, value in values:
                 body = copy.deepcopy(base)
                 set_at(body, path, value)
                 cls.call(plan, body, f"{plan['name']} {'.'.join(str(p) for p in path)}={name}")
