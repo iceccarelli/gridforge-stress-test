@@ -74,9 +74,10 @@ def test_validity_runs_through_the_report_date_inclusive(template):
     assert rank(template, today, "2026-10-28")[0]["C-today"]["disqualified"]
 
 
-@open_defect(106, "bids ranks capex_eur regardless of currency")
 def test_an_offer_in_another_currency_is_not_ranked_as_if_comparable(template):
-    """EUR 400,000 and USD 100,000 are not comparable without an exchange rate, and the engine holds none (its own evidence path says so).
+    """Regression for GridForge-AI#106. Baseline 618b728 FAILED this (USD 100,000 led EUR 400,000); candidate e739233 (PR #108) PASSES.
+
+    EUR 400,000 and USD 100,000 are not comparable without an exchange rate, and the engine holds none (its own evidence path says so).
     The cheaper-looking USD number must not lead; the offer must be disqualified, or flagged not comparable."""
     by, leading = rank(
         template,
@@ -86,7 +87,23 @@ def test_an_offer_in_another_currency_is_not_ranked_as_if_comparable(template):
     assert by["B-usd"]["disqualified"] or any("currency" in n.lower() for n in by["B-usd"]["notes"])
 
 
-@open_defect(106, "bids ranks capex_eur regardless of currency")
+def test_other_offers_still_rank_when_one_is_in_another_currency(template):
+    """The fix must not simply refuse everything: the comparable offers keep their order and the leader is the best of them."""
+    by, leading = rank(
+        template,
+        [
+            bid(template, "A-eur-dear", 400000, 20),
+            bid(template, "B-usd", 100000, 20, currency="USD"),
+            bid(template, "C-eur-cheap", 300000, 20),
+            bid(template, "D-jpy", 800000, 20, currency="JPY"),
+        ],
+    )
+    assert leading == "C-eur-cheap"
+    assert not by["C-eur-cheap"]["disqualified"] and not by["A-eur-dear"]["disqualified"]
+    assert by["B-usd"]["disqualified"] and by["D-jpy"]["disqualified"]
+    assert by["C-eur-cheap"]["rank"] < by["A-eur-dear"]["rank"]
+
+
 def test_a_foreign_currency_offer_is_not_the_only_leader(template):
     _, leading = rank(template, [bid(template, "B-usd", 100000, 20, currency="USD")])
     assert leading != "B-usd"

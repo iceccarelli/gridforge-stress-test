@@ -310,3 +310,37 @@ def test_intake_roots_are_found_by_shape_in_every_nesting_the_routes_use():
     assert found["estimate"] == [("body", "intake")]
     assert found["diff"] == [("before",), ("after",)]
     assert found["qualify"] == [] and found["power_deploy_assess"] == []
+
+
+def test_block_values_are_in_the_catalogue_and_cover_every_type_class():
+    from gridforge_stress import _fuzz_runner as R
+
+    names = {n for n, _ in R.hostile_values()}
+    assert set(R.BLOCK_VALUE_NAMES) <= names, set(R.BLOCK_VALUE_NAMES) - names
+    chosen = [v for n, v in R.hostile_values() if n in R.BLOCK_VALUE_NAMES]
+    classes = {type(v).__name__ for v in chosen}
+    assert {"NoneType", "bool", "str", "int", "float", "list", "dict"} <= classes, classes
+    assert any(isinstance(v, float) and v != v for v in chosen), "NaN"
+    assert any(isinstance(v, float) and v in (float("inf"),) for v in chosen), "inf"
+    assert any(isinstance(v, int) and not isinstance(v, bool) and v > 2**64 for v in chosen), (
+        "huge int"
+    )
+    assert any(isinstance(v, list) and v and v[0] is None for v in chosen), "list containing null"
+
+
+def test_blocks_get_the_reduced_set_and_cost_stays_bounded():
+    import random
+
+    from gridforge_stress import _fuzz_runner as R
+    from gridforge_stress.fuzz import default_plans, reference_intake
+
+    total = 0
+    for p in default_plans(reference_intake(), sample_intake_paths=3):
+        if p["name"] == "loader":
+            continue
+        full, blocks = R.split_paths(p["base"], p["intake_keys"], 3, random.Random(7))
+        assert not set(full) & set(blocks)
+        total += len(full) * len(R.hostile_values()) + len(blocks) * len(R.BLOCK_VALUE_NAMES)
+    assert total < 9000, (
+        total
+    )  # was ~6.1k before blocks; ~12.5k when blocks took the full catalogue
