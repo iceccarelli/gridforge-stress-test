@@ -176,10 +176,12 @@ def evaluate_compare(intake: dict[str, Any], out: dict[str, Any]) -> list[Check]
             if t["weeks"] != 0 or s["as_found"]["racks"] != s["after_ladder"]["racks"]:
                 bad.append(f"{sid}: dated with no lead-time item although racks depend on relief")
             continue
-        worst = max(items, key=lambda x: x["lead_time_weeks"]["value"])["lead_time_weeks"]
-        if t["weeks"] != worst["value"]:
-            bad.append(f"{sid}: weeks {t['weeks']} is not the longest lead time {worst['value']}")
-        if (t["low"], t["high"]) != (worst["low"], worst["high"]):
+        longest = max(x["lead_time_weeks"]["value"] for x in items)
+        # items tied for the longest are all legitimately "the" critical path; the product names one of them
+        tied = [x["lead_time_weeks"] for x in items if x["lead_time_weeks"]["value"] == longest]
+        if t["weeks"] != longest:
+            bad.append(f"{sid}: weeks {t['weeks']} is not the longest lead time {longest}")
+        if (t["low"], t["high"]) not in {(w["low"], w["high"]) for w in tied}:
             bad.append(f"{sid}: range is not the setting item's own range")
         if t["first_rack_weeks"] > t["weeks"]:
             bad.append(f"{sid}: first rack after full capacity")

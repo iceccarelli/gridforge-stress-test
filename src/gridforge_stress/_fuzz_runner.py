@@ -107,15 +107,36 @@ def set_at(doc: Any, path: tuple[Any, ...], value: Any) -> None:
     cur[path[-1]] = value
 
 
+def intake_roots(node: Any, prefix: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
+    """Paths of intake documents anywhere in a request body, found by shape (a dict with both `project` and `grid`), not by where a route puts them."""
+    out: list[tuple[Any, ...]] = []
+    if isinstance(node, dict):
+        if "project" in node and "grid" in node:
+            out.append(prefix)
+        for k, v in node.items():
+            out.extend(intake_roots(v, (*prefix, k)))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            out.extend(intake_roots(v, (*prefix, i)))
+    return out
+
+
 def choose_paths(
     base: Any, intake_keys: list[str], sample: int, rng: random.Random
 ) -> list[tuple[Any, ...]]:
-    """All paths outside the intake subtrees, plus a seeded sample of the paths inside them (the loader is fuzzed exhaustively on its own)."""
+    """All paths outside the intake subtrees, every direct child of each intake document, plus a seeded sample of the deeper paths inside them.
+
+    Without the direct children, a sample of a dozen from ~110 paths drew about one of an intake's twelve top-level blocks per route, so a hostile
+    `intake.project` (the cause of 29 faults on /v1/deck) was never reached."""
+    roots = {r for r in intake_roots(base)}
     outside: list[tuple[Any, ...]] = []
     inside: list[tuple[Any, ...]] = []
     for path in leaf_paths(base):
         # replacing a whole top-level key (e.g. "intake") is cheap and always worth trying; only the paths inside it are sampled
-        (inside if len(path) > 1 and path[0] in intake_keys else outside).append(path)
+        if len(path) > 1 and path[0] in intake_keys and path[:-1] not in roots:
+            inside.append(path)
+        else:
+            outside.append(path)
     if sample < len(inside):
         inside = sorted(rng.sample(inside, sample), key=lambda p: [str(x) for x in p])
     return outside + inside

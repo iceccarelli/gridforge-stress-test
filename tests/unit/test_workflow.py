@@ -678,3 +678,34 @@ def test_a_tariff_declared_as_value_and_note_is_judged_as_declared_not_as_a_plac
     out["retail_price_context"]["assumed"]["eur_per_MWh"] = 140.0
     checks = W.evaluate_price_context(intake, out, state_api(out), "2026-10-27")
     assert {c.id: c.outcome for c in checks}["context.price_limits_are_stated"] == "FAIL"
+
+
+def _tied(scn: dict, low: float, high: float) -> None:
+    scn["time_to_power"].update(weeks=160, low=low, high=high)
+    scn["time_to_power"]["lead_times"] = [
+        lt("Transformer capacity", 160, 80, 210),
+        lt("Gas engine", 160, 104, 216),
+    ]
+
+
+def test_a_tie_for_the_longest_lead_time_accepts_either_tied_items_range():
+    """Found against the real product: with two items at 160 weeks it names one as setting the date and reports that item's range."""
+    out = payload()
+    _tied(sc(out, "full_dlc_btm"), 104, 216)
+    assert outcomes(out)["compare.dates"] == W.PASS
+    out = payload()
+    _tied(sc(out, "full_dlc_btm"), 80, 210)
+    assert outcomes(out)["compare.dates"] == W.PASS
+
+
+def test_a_tie_does_not_excuse_a_range_that_belongs_to_no_tied_item():
+    out = payload()
+    _tied(sc(out, "full_dlc_btm"), 90, 190)
+    assert outcomes(out)["compare.dates"] == W.FAIL
+
+
+def test_a_tie_does_not_excuse_a_wrong_date():
+    out = payload()
+    _tied(sc(out, "full_dlc_btm"), 104, 216)
+    sc(out, "full_dlc_btm")["time_to_power"]["weeks"] = 120
+    assert outcomes(out)["compare.dates"] == W.FAIL

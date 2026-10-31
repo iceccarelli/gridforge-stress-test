@@ -44,13 +44,16 @@ out = []
 for case in json.load(sys.stdin):
     try:
         handler = server.ROUTES[case["route"]][0]
-        server._invoke(case["route"], handler, case["body"], Tier(case["tier"]))
-        out.append({"id": case["id"], "status": "ok"})
+        result = server._invoke(case["route"], handler, case["body"], Tier(case["tier"]))
+        row = {"id": case["id"], "status": "ok"}
+        if case.get("want_result"):
+            row["result"] = result
+        out.append(row)
     except clean as exc:
         out.append({"id": case["id"], "status": "clean", "error": type(exc).__name__, "message": str(exc)[:200]})
     except BaseException as exc:
         out.append({"id": case["id"], "status": "fault", "error": type(exc).__name__, "message": str(exc)[:200]})
-json.dump(out, sys.stdout)
+json.dump(out, sys.stdout, default=str)
 """
 
 GRADE_ORDER = ("undated", "indicative", "screening")
@@ -124,7 +127,8 @@ def call_batch(
     root: Path | None = None,
     timeout: int = 600,
 ) -> dict[str, dict[str, Any]]:
-    """Run `cases` ({id, route, tier, body}) through the real handlers; returns {id: {status: ok|clean|fault, error?, message?}}.
+    """Run `cases` ({id, route, tier, body, want_result?}) through the real handlers; returns {id: {status: ok|clean|fault, error?, message?,
+    result? (only when the case sets want_result)}}.
 
     Unlike `call`, which names only the three journey endpoints, this reaches any registered route so a defect found by the fuzz can be
     reproduced on the route where it escaped. Bodies travel as JSON (NaN/Infinity included, as Python's JSON parser accepts them).
