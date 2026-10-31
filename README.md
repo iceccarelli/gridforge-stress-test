@@ -49,8 +49,9 @@ PASS, FAIL, BLOCKED or UNCHECKED; the exit code is 0 only when every check passe
 record names the engine build it judged, what the oracle cannot judge (`limitations`) and unresolved scope questions for
 the product owner (`open_questions`). The example pack is a synthetic hall that hosts racks under hybrid DLC today while
 full DLC needs facility-water relief. This oracle found, on product `main`, that an omitted transformer lead time became a
-silent 160-week placeholder that sets the date; the fix is GridForge-AI PR 92, so run `product-integration` with
-`product_ref=claude/ecstatic-cerf-tvf84h` until it merges.
+silent 160-week placeholder that sets the date; that was fixed upstream (GridForge-AI PR 92) and the check now passes on product `main`.
+To run the product suite in CI, dispatch `product-integration` with `product_ref` set to a full 40-character commit SHA: a branch or tag is refused,
+because it is not a product identity.
 
 ## First working example
 `tests/integration/test_product_ttp.py` feeds a synthetic reference hall through the product's real

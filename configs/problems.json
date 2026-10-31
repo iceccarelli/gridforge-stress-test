@@ -382,7 +382,7 @@
     {
       "id": "TTP-P009",
       "title": "Supplier offers in different currencies ranked as if comparable",
-      "description": "A procurement ranking that treats a figure in one currency as a figure in another can put the wrong supplier first. The engine holds no exchange rate.",
+      "description": "FIXED on company main 5b90c21 (PR #108), regression retained. A procurement ranking that treats a figure in one currency as a figure in another can put the wrong supplier first. The engine holds no exchange rate.",
       "geography": "Global",
       "customer_segment": "Data-centre developers and EPCs running a supplier tender",
       "buyer": "Procurement lead",
@@ -394,7 +394,7 @@
         "statements": [
           {
             "kind": "observed_fact",
-            "text": "Reproduced on company 618b728: a USD 100,000 offer led a EUR 400,000 offer on /v1/bids; a USD 5,000,000 offer ranked above EUR 25,000,000 on /v1/power/deploy/bids. Filed as GridForge-AI#106; the company's candidate fix (PR #108, e7392332) passes both, not yet merged.",
+            "text": "Reproduced on company 618b728: a USD 100,000 offer led a EUR 400,000 offer on /v1/bids; a USD 5,000,000 offer ranked above EUR 25,000,000 on /v1/power/deploy/bids. Filed as GridForge-AI#106. Fixed by company PR #108 (merged as 5b90c21; its engine tree is byte-identical to the candidate e7392332/292536c validated independently: 223 passed, 0 failed, 12 expected failures). The currency regression tests are retained.",
             "ref": "tests/integration/test_product_bids_and_dates.py; test_product_deploy_bids.py"
           },
           {
