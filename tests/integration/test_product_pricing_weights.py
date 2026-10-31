@@ -1,9 +1,9 @@
 """The unit weights the company publishes must be the ones its engine meters, and its plans must make commercial sense against pay-as-you-go.
 
-PUBLISHED below is an OBSERVATION of the company's own public page, not a fixture: https://timetopower.ai/llms.txt, HTTP 200, 12,364 bytes,
-retrieved 2026-10-31T18:20:41Z, sha256 prefix 91a1a8d49024b42f ("Operations the deployed engine serves today (units are the metered weight)" and
-the three API plan lines). Only the numbers are recorded. The page is not fetched by this test (the laboratory fetches registered sources only), so a
-change to the SITE is not detected here; a change to the ENGINE's weights is, and then the page must be re-read and these constants updated.
+The published figures come from the checksummed record data/fixtures/site_llms_pricing.json (gridforge_stress.site): an observation of the company's own
+https://timetopower.ai/llms.txt, HTTP 200, 12,364 bytes, retrieved 2026-10-31T18:20:41Z, a CLAIM and not evidence about the world. The test does not
+fetch the site, so a change to the SITE is seen only when the page is read again (`gridforge-stress probe timetopower-site-llms` on a runner with
+network); a change to the ENGINE's weights is seen here at once.
 """
 
 from __future__ import annotations
@@ -11,29 +11,20 @@ from __future__ import annotations
 import pytest
 
 from gridforge_stress.fuzz import reference_intake
+from gridforge_stress.paths import fixtures_dir
+from gridforge_stress.site import load_pricing_record
 
 from ._product_helpers import require_product, run
 
 pytestmark = [pytest.mark.integration, pytest.mark.product]
 
-#: endpoint -> units per call as published (portfolio: per hall)
-PUBLISHED = {
-    "/v1/screen": 1,
-    "/v1/compare": 1,
-    "/v1/study": 5,
-    "/v1/portfolio": 1,
-    "/v1/diff": 2,
-    "/v1/spec": 3,
-    "/v1/bids": 2,
-    "/v1/power/assess": 5,
-    "/v1/power/deploy/assess": 5,
-    "/v1/power/deploy/spec": 3,
-    "/v1/power/deploy/bids": 2,
-    "/v1/proposal": 2,
-}
-PER_HALL = {"/v1/portfolio"}
-#: plan name -> (EUR per month, units per month) as published
-PLANS = {"Triage": (900, 600), "Scale": (2900, 2500), "Platform": (7500, 10000)}
+RECORD = load_pricing_record(fixtures_dir() / "site_llms_pricing.json")
+WEIGHTS = RECORD["weights"]
+PUBLISHED = {ep: w["units"] for ep, w in WEIGHTS.items() if not w["free"]}
+FREE = sorted(ep for ep, w in WEIGHTS.items() if w["free"])
+PER_HALL = {ep for ep, w in WEIGHTS.items() if w["per_hall"]}
+#: plan name -> (EUR per month, units per month)
+PLANS = {name: (p["eur_per_month"], p["units_per_month"]) for name, p in RECORD["plans"].items()}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -49,6 +40,22 @@ def estimate(endpoint, halls=1):
 @pytest.mark.parametrize("endpoint", sorted(PUBLISHED))
 def test_the_engine_meters_what_the_company_publishes(endpoint):
     assert estimate(endpoint)["units"] == PUBLISHED[endpoint]
+
+
+@pytest.mark.parametrize("endpoint", FREE)
+def test_the_endpoints_the_company_calls_free_are_not_billed(endpoint):
+    e = estimate(endpoint)
+    assert (e["units"], e["estimated_cents"], e["billable"], e["free"]) == (0, 0, False, True)
+
+
+def test_the_record_covers_what_it_should():
+    """Guards against a vacuous parametrisation: a changed fixture that lost endpoints would otherwise pass by testing fewer."""
+    assert (
+        len(PUBLISHED) >= 12
+        and len(FREE) >= 2
+        and {"/v1/portfolio"} == PER_HALL
+        and len(PLANS) == 3
+    )
 
 
 @pytest.mark.parametrize("halls", [2, 5, 20])

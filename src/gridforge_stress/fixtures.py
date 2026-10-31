@@ -62,6 +62,14 @@ def _content_check(path: Path) -> list[Finding]:
         except (PriceContextError, KeyError, ValueError) as exc:
             return [Finding("bad_price_context", str(exc))]
         return []
+    if name == "site_llms_pricing.json":
+        from .site import SitePricingError, load_pricing_record
+
+        try:
+            load_pricing_record(path)
+        except (SitePricingError, KeyError, ValueError) as exc:
+            return [Finding("bad_site_pricing", str(exc))]
+        return []
     if name == "poi_synthetic.json":
         bad = [p for p in load_json(path)["pois"] if classify_poi(p)["is_allocation"]]
         return [Finding("poi_promoted", f"{p['name']} classified as allocation") for p in bad]
