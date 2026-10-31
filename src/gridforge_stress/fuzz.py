@@ -109,12 +109,19 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
         "ride_through_hours": 3,
         "redundancy": "N+1",
     }
+    # All seven fields the qualifier reads: a body missing more than four is refused before any logic runs, which is all the previous
+    # base (two of the seven) ever exercised. Values are the reference hall's.
     qualify = {
         "site_name": "Synthetic",
         "metro": "Frankfurt",
         "contracted_MW": 12,
         "current_site_peak_MW": 7.4,
         "firm_capacity_MVA": 14,
+        "current_it_load_MW": 4.9,
+        "busway_ampacity_A": 400,
+        "tapoff_max_A": 63,
+        "plant_supply_C": 6,
+        "positions_available": 180,
     }
     hall_response = {
         "supplier": "Synthetic Supplier A",
@@ -128,7 +135,11 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
             "outage_hours_per_unit": 6,
             "validity_days": 90,
         },
-        "compliance": {"E-10": "YES", "E-11": "YES", "C-01": "YES"},
+        "compliance": {
+            "E-10": "C",
+            "E-11": "C",
+            "C-01": "C",
+        },  # the product accepts C, CD or N; "YES" is refused before ranking
         "text": {"note": "synthetic"},
     }
     deploy_response = {
