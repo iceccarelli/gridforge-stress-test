@@ -50,3 +50,14 @@ def test_no_source_is_documented_as_live():
     text = (ROOT / "docs" / "data-sources.md").read_text()
     assert all(s.live_fetch != "enabled" for s in load_sources().values())
     assert "none is\nenabled" in text or "none is enabled" in text
+
+
+def test_docs_never_tell_anyone_to_dispatch_the_product_workflow_with_a_branch():
+    """product-integration refuses anything but a full 40-character SHA (a branch is not a product identity); the prose must agree with it."""
+    bad = []
+    for path in [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *(ROOT / "docs").glob("*.md")]:
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            for m in re.finditer(r"product_ref\s*=\s*`?([^\s`,.;)]+)", line):
+                if not re.fullmatch(r"[0-9a-f]{40}", m.group(1)):
+                    bad.append(f"{path.name}:{n}: product_ref={m.group(1)}")
+    assert not bad, bad
