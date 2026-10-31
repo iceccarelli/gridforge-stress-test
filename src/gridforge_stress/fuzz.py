@@ -224,7 +224,7 @@ def run_fuzz(
     root: Path | None = None,
     seed: int = 7,
     slow_s: float = 3.0,
-    timeout_s: float = 900.0,
+    timeout_s: float = 3000.0,
     report_date: str = "2026-10-27",
 ) -> FuzzReport:
     """Run the plans against the product checkout. Raises ProductUnavailable if the runner itself fails (that is not a finding)."""

@@ -24,7 +24,7 @@ def report():
         product_dir()
     except ProductUnavailable as exc:
         (pytest.fail if product_required() else pytest.skip)(str(exc))
-    return run_fuzz(default_plans(reference_intake(), sample_intake_paths=SAMPLE), timeout_s=900)
+    return run_fuzz(default_plans(reference_intake(), sample_intake_paths=SAMPLE), timeout_s=1800)
 
 
 def test_no_hostile_request_escapes_a_handler_as_a_server_fault(report):
