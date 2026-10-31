@@ -148,3 +148,92 @@ def test_the_supplied_figures_table_never_shows_validation_level_evidence():
     ]
     assert rows, "premise: the figure appears in the supplied-with-a-source table"
     assert all(not re.search(r"\|\s*E[67]\s*\|", r) for r in rows), rows
+
+
+# --- which fields keep a buyer's source? (47 numeric leaves of the reference intake, measured on company d54e893) ---------------------------------
+DROPPED = (
+    "hall.build_year",
+    "hall.rack_positions",
+    "hall.positions_available",
+    "lv.phases",
+    "lv.busway_runs",
+    "economics.horizon_years",
+)
+#: The fields the company's buyer-confirmation flow (#109 CONFIRMABLE) can target. They are in SHOWN below, so they are asserted to keep their source.
+CONFIRMABLE = (
+    "grid.firm_capacity_MVA",
+    "hall.floor_loading_kPa",
+    "thermal.plant.chilled_water_capacity_kW",
+)
+SHOWN = (
+    "grid.current_site_peak_MW",
+    "grid.contracted_MW",
+    "grid.power_factor",
+    "grid.current_it_load_MW",
+    *CONFIRMABLE,
+)
+OPEN_110 = pytest.mark.xfail(
+    strict=True,
+    reason="GridForge-AI#110: annotated value accepted, source and note silently dropped",
+)
+
+
+def annotate(dotted, **fields):
+    keys = dotted.split(".")
+
+    def edit(d):
+        cur = d
+        for k in keys[:-1]:
+            cur = cur[k]
+        cur[keys[-1]] = {
+            "value": cur[keys[-1]]["value"] if isinstance(cur[keys[-1]], dict) else cur[keys[-1]],
+            **fields,
+        }
+
+    return mutated(edit)
+
+
+@pytest.mark.parametrize(
+    "path", [pytest.param(p, marks=OPEN_110) if p in DROPPED else p for p in (*SHOWN, *DROPPED)]
+)
+def test_an_annotated_figure_is_either_shown_with_its_source_or_refused(path):
+    from gridforge_stress.product_adapter import call_batch
+
+    body = {"intake": annotate(path, source="SRC-MARK", note="NOTE-MARK"), "format": "md"}
+    r = call_batch(
+        [{"id": "x", "route": "/v1/screen", "tier": "client", "body": body, "want_result": True}]
+    )["x"]
+    if r["status"] == "clean":
+        return  # refused with a message: an acceptable answer
+    assert r["status"] == "ok", r
+    doc = r["result"]["document"]
+    assert "SRC-MARK" in doc and "NOTE-MARK" in doc, (
+        f"{path}: accepted, but its source and note appear nowhere in the report"
+    )
+
+
+def test_list_field_values_are_refused_cleanly_not_crashed():
+    """Transformer / UPS / BTM figures cannot carry an annotation (a limitation, not asserted as a defect); the refusal must be controlled."""
+    from gridforge_stress.product_adapter import call_batch
+
+    for path in ("transformers.0.units", "ups.0.unit_rating_kW", "btm_options.0.capacity_MW"):
+        keys = path.split(".")
+
+        def edit(d, keys=keys):
+            cur = d
+            for k in keys[:-1]:
+                cur = cur[int(k)] if k.isdigit() else cur[k]
+            last = int(keys[-1]) if keys[-1].isdigit() else keys[-1]
+            cur[last] = {"value": cur[last], "source": "s"}
+
+        r = call_batch(
+            [
+                {
+                    "id": "x",
+                    "route": "/v1/screen",
+                    "tier": "client",
+                    "body": {"intake": mutated(edit)},
+                }
+            ]
+        )["x"]
+        assert r["status"] in ("ok", "clean"), (path, r)
