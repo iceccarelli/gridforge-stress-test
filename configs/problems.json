@@ -169,6 +169,11 @@
             "kind": "search_snippet_unverified",
             "text": "Search summaries attribute a ~128-week average power-transformer lead time to Wood Mackenzie (Q2 2025); the page was not read and the full report is paywalled.",
             "ref": "unregistered: woodmac.com"
+          },
+          {
+            "kind": "observed_fact",
+            "text": "A supplied transformer lead time keeps the placeholder band 80-210 weeks, so the stated date can lie outside its own range, in 9 places per response on screen, study and compare. Open as GridForge-AI#107.",
+            "ref": "tests/integration/test_product_bids_and_dates.py; test_product_value_ranges.py"
           }
         ]
       },
@@ -191,7 +196,7 @@
       "acceptance_criteria": "Date range is never shorter than the longest supplied lead time; missing lead time yields no date",
       "monetization_hypothesis": "Procurement risk engagement (unvalidated)",
       "validation_status": "hypothesis_unvalidated_with_customers",
-      "last_researched": "2026-10-30",
+      "last_researched": "2026-10-31",
       "harness_checks": [
         "oracle.critical_path"
       ]
@@ -254,6 +259,11 @@
             "kind": "observed_fact",
             "text": "Harness already tests a power-factor case; audit found no dedicated MVA-vs-MW oracle in workflow.py.",
             "ref": "tests/integration/test_product_adversarial.py"
+          },
+          {
+            "kind": "observed_fact",
+            "text": "An independent headroom oracle (transformer N/N+1/N+2/2N and derating, UPS redundancy, MVA x power factor vs contracted MW) agrees with the product on 17 intake variants on company 618b728.",
+            "ref": "tests/integration/test_product_constraint_oracle.py; src/gridforge_stress/oracles.py"
           }
         ]
       },
@@ -271,7 +281,7 @@
       "acceptance_criteria": "Racks never exceed the intake-derived ceiling",
       "monetization_hypothesis": "Qualifier (unvalidated)",
       "validation_status": "hypothesis_unvalidated_with_customers",
-      "last_researched": "2026-10-30",
+      "last_researched": "2026-10-31",
       "harness_checks": [
         "workflow.supply_bound"
       ]
@@ -293,6 +303,11 @@
             "kind": "hypothesis",
             "text": "Audit found no BESS energy-vs-power oracle; product behaviour untested.",
             "ref": "audit"
+          },
+          {
+            "kind": "observed_fact",
+            "text": "On the deploy route, availability never exceeds the power rating or the stored energy, a longer ride-through never helps, and a 20 MW / 1 MWh battery is not credited for 4 h (13 tests, company 618b728). On the hall route energy_MWh has no effect, by the company's documented default.",
+            "ref": "tests/integration/test_product_bess.py"
           }
         ]
       },
@@ -310,7 +325,7 @@
       "acceptance_criteria": "Reducing MWh never increases credited capacity",
       "monetization_hypothesis": "Sizing check (unvalidated)",
       "validation_status": "hypothesis_unvalidated_with_customers",
-      "last_researched": "2026-10-30",
+      "last_researched": "2026-10-31",
       "harness_checks": [
         "oracle.bess_energy"
       ]
@@ -318,7 +333,7 @@
     {
       "id": "TTP-P008",
       "title": "Malformed intake crashes document routes instead of being refused",
-      "description": "A non-object intake.project escapes as an internal error on deck, proposal, spec and bids, so a customer gets a server error and no deliverable.",
+      "description": "FIXED on company 618b728 (PR #105), regression retained. A non-object intake.project escaped as an internal error on deck, proposal, spec and bids, so a customer got a server error and no deliverable.",
       "geography": "Product (all)",
       "customer_segment": "Any customer submitting an intake",
       "buyer": "Product owner",
@@ -332,6 +347,16 @@
             "kind": "observed_fact",
             "text": "Reproduced 2026-10-30 at product 8bbcdf7: 22 malformed project shapes fault on each of deck, proposal, spec, bids (88 faults).",
             "ref": "tests/integration/test_product_intake_project_shape.py"
+          },
+          {
+            "kind": "observed_fact",
+            "text": "Reproduced 88 server faults on company 8bbcdf7. Fixed by company PR #105 (non-object project is now an IntakeError); retest on 618b728: regression 4 passed; fixed-seed fuzz 14,364 calls, 0 faults.",
+            "ref": "tests/integration/test_product_intake_project_shape.py; GridForge-AI#104"
+          },
+          {
+            "kind": "observed_fact",
+            "text": "With every intake block now always fuzzed, 20,748 calls on 618b728: 0 server faults, 0 slow.",
+            "ref": "gridforge-stress fuzz --seed 20261030"
           }
         ]
       },
@@ -349,9 +374,55 @@
       "acceptance_criteria": "All shapes refused safely; valid examples unchanged",
       "monetization_hypothesis": "n/a (defect)",
       "validation_status": "hypothesis_unvalidated_with_customers",
-      "last_researched": "2026-10-30",
+      "last_researched": "2026-10-31",
       "harness_checks": [
         "test_product_intake_project_shape"
+      ]
+    },
+    {
+      "id": "TTP-P009",
+      "title": "Supplier offers in different currencies ranked as if comparable",
+      "description": "A procurement ranking that treats a figure in one currency as a figure in another can put the wrong supplier first. The engine holds no exchange rate.",
+      "geography": "Global",
+      "customer_segment": "Data-centre developers and EPCs running a supplier tender",
+      "buyer": "Procurement lead",
+      "decision_blocked": "Which supplier to award a long-lead equipment package to",
+      "consequence": "A supplier appears cheapest because of its currency, not its price",
+      "consequence_quantified": null,
+      "evidence": {
+        "strength": "moderate",
+        "statements": [
+          {
+            "kind": "observed_fact",
+            "text": "Reproduced on company 618b728: a USD 100,000 offer led a EUR 400,000 offer on /v1/bids; a USD 5,000,000 offer ranked above EUR 25,000,000 on /v1/power/deploy/bids. Filed as GridForge-AI#106; the company's candidate fix (PR #108, e7392332) passes both, not yet merged.",
+            "ref": "tests/integration/test_product_bids_and_dates.py; test_product_deploy_bids.py"
+          },
+          {
+            "kind": "hypothesis",
+            "text": "Real tenders mix currencies often enough for this to matter; no customer evidence gathered.",
+            "ref": "none"
+          }
+        ]
+      },
+      "source_ids": [],
+      "unregistered_candidate_sources": [],
+      "unknown": [
+        "How often real tenders mix currencies",
+        "Whether buyers expect conversion or a refusal"
+      ],
+      "current_alternatives": [
+        "Manual comparison in a spreadsheet"
+      ],
+      "potential_gridforge_solution": "Rank only comparable offers and say why the others are excluded",
+      "response_type": "software",
+      "success_metric": "Share of mixed-currency tenders where no incomparable offer is ranked",
+      "acceptance_criteria": "A non-EUR offer is never ranked on its face value against EUR offers, on every bids route",
+      "monetization_hypothesis": "Part of the Procurement Specification service (unvalidated)",
+      "validation_status": "hypothesis_unvalidated_with_customers",
+      "last_researched": "2026-10-31",
+      "harness_checks": [
+        "test_product_bids_and_dates",
+        "test_product_deploy_bids"
       ]
     }
   ]
