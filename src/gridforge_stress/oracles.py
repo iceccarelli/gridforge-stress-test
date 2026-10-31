@@ -157,3 +157,35 @@ def check_screen(intake: dict[str, Any], screen: dict[str, Any]) -> list[str]:
             if got != want:
                 problems.append(f"{sid}.{cid}: product permits {got} racks, independent {want}")
     return problems
+
+
+def bess_bound_violations(
+    *,
+    grid_firm_mw: float,
+    power_mw: float,
+    energy_mwh: float,
+    ride_through_h: float,
+    available_mw: float,
+) -> list[str]:
+    """Physical bounds on 'grid + BESS' firm availability over a stated ride-through. Empty means no bound is violated.
+
+    EVALUATES: only what no battery can beat. (1) it never reduces the grid; (2) it never adds more than its power rating; (3) it never
+    delivers more energy than it holds: (available - grid) x hours <= nameplate MWh (usable energy is smaller, so this is the loosest true bound).
+    DOES NOT EVALUATE: the exact usable-energy window, efficiency, degradation or auxiliary load (library assumptions of the product, not
+    physics), nor whether the answer is exactly right: a product that is too conservative passes. Independence: derived from power and
+    energy conservation; no product constant is used.
+    """
+    eps = 1e-6
+    added = available_mw - grid_firm_mw
+    out: list[str] = []
+    if added < -eps:
+        out.append(
+            f"the battery reduced availability: {available_mw:g} MW < grid {grid_firm_mw:g} MW"
+        )
+    if added > power_mw + eps:
+        out.append(f"added {added:g} MW exceeds the {power_mw:g} MW power rating")
+    if ride_through_h > 0 and added * ride_through_h > energy_mwh + eps:
+        out.append(
+            f"added {added:g} MW for {ride_through_h:g} h needs {added * ride_through_h:g} MWh, more than the {energy_mwh:g} MWh stored"
+        )
+    return out

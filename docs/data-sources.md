@@ -1,6 +1,6 @@
 # Data sources
 
-State as of 2026-10-28. Evidence comes from the `probe` workflow (`.github/workflows/probe.yml`), which reads each
+State as of 2026-10-31. Evidence comes from the `probe` workflow (`.github/workflows/probe.yml`), which reads each
 registered publisher page on a GitHub runner through the harness's guarded fetch layer (registered hosts only, public
 IPs only, size-capped, no credentials, nothing stored). The sandbox where this repo is authored has no route to these
 hosts, so a probe run is the only way pages get read. `configs/sources.json` records, per source, what was actually
@@ -17,9 +17,10 @@ read and which run read it; anything not shown stays `UNVERIFIED`.
 | nrel-cambium | unverified | yes, via the official NLR Cambium page | disabled | 2024 release (fifth annual edition); viewer URL is an app shell |
 | openei-urdb | API key | yes | disabled | `api_key` required (free); docs page last modified 2017 |
 | nws-api | public | yes | disabled | User-Agent with contact required |
+| eia-epm | public | no (one plain GET outside the harness fetch path, 2026-10-30; not a probe run) | disabled | Electric Power Monthly Table 5.6.A (release of October 23, 2026) was parsed into the `eia_retail_price_context` fixture; licence UNVERIFIED, status stays `unverified` until a probe run reads it |
 
 `live_fetch: enabled` is allowed only for a source whose publisher page was read AND with a tested reason; none is
-enabled. Reading a page is not the same as downloading or parsing its data. The only dataset read so far is the LBNL workbook, inspected
+enabled. Reading a page is not the same as downloading or parsing its data. The only dataset read through the harness so far is the LBNL workbook, inspected
 in memory by explicit request (`probe lbnl-queued-up --peek-xlsx|--profile|--queue-stats`); it was never stored or promoted to `fetched_validated`.
 
 To verify or extend a source: `gridforge-stress probe <id>` (or dispatch the `probe` workflow), read the output, update
