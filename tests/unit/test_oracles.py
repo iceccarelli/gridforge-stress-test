@@ -14,6 +14,7 @@ from gridforge_stress.oracles import (
     effective_units,
     expected_headroom_kw,
     printed_tolerance_kw,
+    qualifier_violations,
     racks_for,
 )
 
@@ -282,3 +283,41 @@ def test_the_printed_tolerance_is_exactly_the_rounding_the_product_applies(expec
 def test_an_off_by_one_unit_error_is_hundreds_of_times_the_tolerance():
     """The loosening must not hide a real engineering error: one transformer unit is ~4,365 kW against a 5 kW tolerance at 1,330 kW."""
     assert 4365.0 / printed_tolerance_kw(1330.0) > 400
+
+
+# --- the free qualifier's physical bounds -----------------------------------------------------------------------------------------------------------
+REQ = {"contracted_MW": 12.0, "current_site_peak_MW": 7.4, "positions_available": 180}
+
+
+def qres(found=0, after=28, rack_low=132):
+    return {
+        "platform": {"rack_kW": {"low": rack_low}},
+        "as_found": {"racks": found},
+        "after_relief": {"racks": after},
+    }
+
+
+def test_a_physically_possible_qualifier_answer_has_no_violation():
+    assert qualifier_violations(REQ, qres()) == []
+    assert (
+        qualifier_violations(REQ, qres(found=3, after=34)) == []
+    )  # 4,600 kW / 132 = 34.8: exactly at the ceiling
+
+
+@pytest.mark.parametrize(
+    "name,req,res",
+    [
+        ("found_above_after", REQ, qres(found=30, after=28)),
+        ("more_racks_than_positions", {**REQ, "positions_available": 20}, qres(after=28)),
+        ("one_rack_over_the_headroom_ceiling", REQ, qres(after=35)),
+        ("racks_with_no_headroom", {**REQ, "current_site_peak_MW": 12.0}, qres(after=1)),
+        ("racks_with_negative_headroom", {**REQ, "current_site_peak_MW": 13.0}, qres(after=1)),
+        ("as_found_over_positions", {**REQ, "positions_available": 2}, qres(found=5, after=5)),
+    ],
+)
+def test_the_qualifier_oracle_catches_each_impossible_answer(name, req, res):
+    assert qualifier_violations(req, res), name
+
+
+def test_the_qualifier_oracle_allows_zero_racks_when_there_is_no_headroom():
+    assert qualifier_violations({**REQ, "current_site_peak_MW": 13.0}, qres(found=0, after=0)) == []

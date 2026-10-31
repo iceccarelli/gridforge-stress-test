@@ -199,3 +199,30 @@ def bess_bound_violations(
             f"added {added:g} MW for {ride_through_h:g} h needs {added * ride_through_h:g} MWh, more than the {energy_mwh:g} MWh stored"
         )
     return out
+
+
+def qualifier_violations(request: dict[str, Any], result: dict[str, Any]) -> list[str]:
+    """Physical bounds on the free qualifier's answer, from the request alone. Empty means none is violated.
+
+    EVALUATES. (1) it never promises fewer racks as found than after relief; (2) it never promises more racks than available positions;
+    (3) it never promises more racks than the contracted-minus-peak headroom could feed at the LOWEST rack power the product itself declares
+    (a hard ceiling: any PUE or other overhead only lowers it). DOES NOT EVALUATE the exact count, cooling, busway or tap-off limits.
+    INDEPENDENCE. Only the request and the rack power the product prints; no product formula.
+    """
+    out: list[str] = []
+    found, after = result["as_found"]["racks"], result["after_relief"]["racks"]
+    if found > after:
+        out.append(f"as found {found} racks exceeds after relief {after}")
+    positions = request.get("positions_available")
+    for name, racks in (("as found", found), ("after relief", after)):
+        if positions is not None and racks > positions:
+            out.append(f"{name} {racks} racks exceeds the {positions} positions available")
+    headroom_kw = (_num(request["contracted_MW"]) - _num(request["current_site_peak_MW"])) * 1000.0
+    rack_low = _num(result["platform"]["rack_kW"]["low"])
+    ceiling = 0 if headroom_kw <= 0 else math.floor(headroom_kw / rack_low)
+    for name, racks in (("as found", found), ("after relief", after)):
+        if racks > ceiling:
+            out.append(
+                f"{name} {racks} racks exceeds the {ceiling} the {headroom_kw:g} kW of headroom could feed at {rack_low:g} kW per rack"
+            )
+    return out
