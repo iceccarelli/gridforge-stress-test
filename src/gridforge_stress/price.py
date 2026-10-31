@@ -131,23 +131,78 @@ class PriceContextError(ValueError):
     """The price-context fixture is not usable; the message says why."""
 
 
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for k, v in pairs:
+        if k in out:
+            raise PriceContextError(f"duplicate key {k!r}: the last value would silently win")
+        out[k] = v
+    return out
+
+
+def _months_before(period: str, prior: str) -> int:
+    (y1, m1), (y0, m0) = (tuple(int(x) for x in p.split("-")) for p in (period, prior))
+    return (y1 * 12 + m1) - (y0 * 12 + m0)
+
+
 def load_price_context(path: Any) -> dict[str, Any]:
-    """Read and validate the fixture: schema, an unmistakable period, a US total, and prices that are plausible numbers or null."""
+    """Read and validate the fixture. Refuses, with a reason: wrong schema/source/unit, an unmistakable period whose prior period is exactly
+    twelve months earlier, missing sectors or values, booleans/NaN/implausible prices, a US total outside the range of the states it
+    summarises, duplicate keys, and provenance without a content hash."""
     import json
+    import math
     from pathlib import Path
 
-    doc: dict[str, Any] = json.loads(Path(path).read_text(encoding="utf-8"))
-    if doc.get("schema") != SCHEMA:
+    try:
+        doc = json.loads(
+            Path(path).read_text(encoding="utf-8"), object_pairs_hook=_no_duplicate_keys
+        )
+    except json.JSONDecodeError as exc:
+        raise PriceContextError(f"not valid JSON: {exc.msg}") from None
+    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA:
         raise PriceContextError("unrecognised price-context schema")
-    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", str(doc.get("period", ""))):
+    if doc.get("source_id") != "eia-epm":
+        raise PriceContextError(f"source_id {doc.get('source_id')!r} is not eia-epm")
+    if doc.get("unit") != "US cents per kWh":
+        raise PriceContextError(f"unit {doc.get('unit')!r}: prices are US cents per kWh")
+    if doc.get("evidence_kind") != "retail_price_statistic":
+        raise PriceContextError("evidence_kind must stay retail_price_statistic (not a tariff)")
+    period, prior = str(doc.get("period", "")), str(doc.get("prior_period", ""))
+    pattern = r"\d{4}-(0[1-9]|1[0-2])"
+    if not re.fullmatch(pattern, period):
         raise PriceContextError("period must be YYYY-MM")
-    rows = doc.get("rows") or {}
-    if "U.S. Total" not in rows or len(rows) < 50:
+    if not re.fullmatch(pattern, prior) or _months_before(period, prior) != 12:
+        raise PriceContextError("prior_period must be exactly twelve months before period")
+    prov = doc.get("provenance")
+    if (
+        not isinstance(prov, dict)
+        or not re.fullmatch(r"[0-9a-f]{64}", str(prov.get("page_sha256", "")))
+        or not isinstance(prov.get("page_bytes"), int)
+        or isinstance(prov.get("page_bytes"), bool)
+        or prov["page_bytes"] <= 0
+    ):
+        raise PriceContextError("provenance needs page_sha256 (64 hex) and positive page_bytes")
+    rows = doc.get("rows")
+    if not isinstance(rows, dict) or "U.S. Total" not in rows or len(rows) < 50:
         raise PriceContextError("needs the US total and the states")
     for name, sec in rows.items():
         for s in REPORTED:
             for k in ("current", "prior"):
-                v = sec[s][k]
-                if v is not None and not (isinstance(v, (int, float)) and 0 < v < 1000):
+                try:
+                    v = sec[s][k]
+                except (KeyError, TypeError):
+                    raise PriceContextError(f"{name}: missing {s}.{k}") from None
+                if v is None:
+                    continue
+                ok = isinstance(v, (int, float)) and not isinstance(v, bool)
+                if not (ok and math.isfinite(v) and 0 < v < 1000):
                     raise PriceContextError(f"{name} {s} {k}: {v!r} is not a plausible price")
+    for s in REPORTED:
+        for k in ("current", "prior"):
+            vals = [r[s][k] for n, r in rows.items() if n != "U.S. Total" and r[s][k] is not None]
+            us = rows["U.S. Total"][s][k]
+            if us is not None and vals and not (min(vals) <= us <= max(vals)):
+                raise PriceContextError(
+                    f"U.S. Total {s} {k} {us} lies outside the range of the rows it summarises"
+                )
     return doc
