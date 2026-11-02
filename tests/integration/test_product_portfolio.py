@@ -1,7 +1,7 @@
 """The Portfolio Screen (/v1/portfolio) against screening each hall on its own.
 
-Independent expectations come from /v1/screen for each intake (the recommended scenario), never from the portfolio's own rows. The one open
-defect (the same hall listed twice is counted twice) is a strict xfail tied to GridForge-AI#112."""
+Independent expectations come from /v1/screen for each intake (the recommended scenario), never from the portfolio's own rows. The former
+open defect (the same hall listed twice was counted twice, GridForge-AI#112) is fixed in the product and is an ordinary regression."""
 
 from __future__ import annotations
 
@@ -98,10 +98,6 @@ def test_a_single_hall_portfolio_equals_the_screen(expected):
     assert run("/v1/portfolio", {"intakes": [A]})["total_racks"] == expected["DH-02"][0]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GridForge-AI#112: the same hall listed twice is counted twice, with no warning",
-)
 def test_the_same_hall_listed_twice_is_not_counted_twice(expected):
     from gridforge_stress.product_adapter import call_batch
 

@@ -1,7 +1,8 @@
 """Every quantity in every response lies inside its own stated range (gridforge_stress.invariants).
 
 Ordinary variants must have zero violations. A supplied transformer lead time outside the placeholder band 80-210 weeks still breaks the
-invariant in many places at once (GridForge-AI#107): that is recorded as a strict xfail, so the fix flips it and the marker must then go."""
+invariant in many places at once (GridForge-AI#107). Fixed in the product: a supplied lead time now carries a range around itself, so these are
+ordinary regressions (they were strict xfails until then)."""
 
 from __future__ import annotations
 
@@ -28,11 +29,7 @@ CLEAN = {
         replacement_lead_time_weeks=200
     ),
 }
-BAND = "GridForge-AI#107: a supplied transformer lead time keeps the placeholder band 80-210"
-OUTSIDE = [
-    pytest.param(36, marks=pytest.mark.xfail(strict=True, reason=BAND)),
-    pytest.param(300, marks=pytest.mark.xfail(strict=True, reason=BAND)),
-]
+OUTSIDE = [36, 300]
 ROUTES = ("/v1/screen", "/v1/study", "/v1/compare")
 
 

@@ -172,10 +172,6 @@ SHOWN = (
     "grid.current_it_load_MW",
     *CONFIRMABLE,
 )
-OPEN_110 = pytest.mark.xfail(
-    strict=True,
-    reason="GridForge-AI#110: annotated value accepted, source and note silently dropped",
-)
 
 
 def annotate(dotted, **fields):
@@ -193,9 +189,7 @@ def annotate(dotted, **fields):
     return mutated(edit)
 
 
-@pytest.mark.parametrize(
-    "path", [pytest.param(p, marks=OPEN_110) if p in DROPPED else p for p in (*SHOWN, *DROPPED)]
-)
+@pytest.mark.parametrize("path", [*SHOWN, *DROPPED])
 def test_an_annotated_figure_is_either_shown_with_its_source_or_refused(path):
     from gridforge_stress.product_adapter import call_batch
 

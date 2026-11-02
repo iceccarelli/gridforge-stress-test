@@ -14,11 +14,6 @@ from ._product_helpers import mutated, require_product, run
 pytestmark = [pytest.mark.integration, pytest.mark.product]
 
 
-def open_defect(issue: int, why: str):
-    """A reproduced, issue-tracked company defect. strict: when the company fixes it the XPASS fails the suite and this marker must go."""
-    return pytest.mark.xfail(strict=True, reason=f"GridForge-AI#{issue}: {why}")
-
-
 @pytest.fixture(scope="module", autouse=True)
 def _need_product():
     require_product()
@@ -109,19 +104,7 @@ def test_a_foreign_currency_offer_is_not_the_only_leader(template):
     assert leading != "B-usd"
 
 
-BAND = "supplied lead time keeps the placeholder band 80-210"
-
-
-@pytest.mark.parametrize(
-    "weeks",
-    [
-        pytest.param(36, marks=open_defect(107, BAND)),
-        pytest.param(44, marks=open_defect(107, BAND)),
-        160,
-        200,
-        pytest.param(300, marks=open_defect(107, BAND)),
-    ],
-)
+@pytest.mark.parametrize("weeks", [36, 44, 160, 200, 300])
 def test_a_supplied_transformer_lead_time_lies_inside_its_own_stated_range(weeks):
     d = mutated(lambda x: x["transformers"][0].update(replacement_lead_time_weeks=weeks))
     out = run("/v1/compare", {"intake": d})
