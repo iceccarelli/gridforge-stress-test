@@ -72,6 +72,10 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
     """One plan per route, each with a valid base body. `intake_keys` names the subtrees that are intake documents: the loader is fuzzed
     exhaustively on its own, so inside those subtrees only a seeded sample of paths is tried per route."""
 
+    # A portfolio counts a hall once, so its base body lists two DIFFERENT halls (the product refuses the same hall twice).
+    second_hall: dict[str, Any] = json.loads(json.dumps(intake))
+    second_hall.setdefault("hall", {})["id"] = f"{second_hall['hall'].get('id', 'HALL')}-B"
+
     def plan(
         name: str, route: str, base: dict[str, Any], keys: list[str], tier: str = "client"
     ) -> dict[str, Any]:
@@ -213,7 +217,7 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
             {**deploy, "responses": [deploy_response]},
             [],
         ),
-        plan("portfolio", "/v1/portfolio", {"intakes": [intake, intake]}, ["intakes"]),
+        plan("portfolio", "/v1/portfolio", {"intakes": [intake, second_hall]}, ["intakes"]),
         plan(
             "power_assess", "/v1/power/assess", {"intake": intake, "target_racks": 40}, ["intake"]
         ),
