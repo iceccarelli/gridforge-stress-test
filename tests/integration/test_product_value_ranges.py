@@ -30,9 +30,9 @@ CLEAN = {
 }
 BAND = "GridForge-AI#107: a supplied transformer lead time keeps the placeholder band 80-210"
 OUTSIDE = [
-    pytest.param(36, marks=pytest.mark.xfail(strict=True, reason=BAND)),
-    pytest.param(300, marks=pytest.mark.xfail(strict=True, reason=BAND)),
-]
+    36,
+    300,
+]  # GridForge-AI#107 is fixed: a supplied lead time carries a band around itself, not the placeholder 80-210
 ROUTES = ("/v1/screen", "/v1/study", "/v1/compare")
 
 

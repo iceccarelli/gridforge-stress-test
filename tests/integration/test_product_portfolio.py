@@ -98,10 +98,6 @@ def test_a_single_hall_portfolio_equals_the_screen(expected):
     assert run("/v1/portfolio", {"intakes": [A]})["total_racks"] == expected["DH-02"][0]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GridForge-AI#112: the same hall listed twice is counted twice, with no warning",
-)
 def test_the_same_hall_listed_twice_is_not_counted_twice(expected):
     from gridforge_stress.product_adapter import call_batch
 

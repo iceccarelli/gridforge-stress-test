@@ -68,9 +68,23 @@ def reference_intake() -> dict[str, Any]:
     return doc
 
 
+def _second_hall(intake: dict[str, Any]) -> dict[str, Any]:
+    """A genuinely different hall for the portfolio base body: its own site and hall ids and a different grid contract. The same hall twice is
+    the double-counting scenario, which the product now refuses by name, so it cannot serve as a body that must be answered."""
+    other: dict[str, Any] = json.loads(json.dumps(intake))
+    other.setdefault("site", {})["id"] = "FUZZ-SITE-2"
+    other.setdefault("hall", {})["id"] = "FUZZ-HALL-2"
+    grid = other.setdefault("grid", {})
+    if isinstance(grid.get("contracted_MW"), (int, float)):
+        grid["contracted_MW"] = grid["contracted_MW"] - 1.0
+    return other
+
+
 def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> list[dict[str, Any]]:
     """One plan per route, each with a valid base body. `intake_keys` names the subtrees that are intake documents: the loader is fuzzed
     exhaustively on its own, so inside those subtrees only a seeded sample of paths is tried per route."""
+
+    second_hall = _second_hall(intake)
 
     def plan(
         name: str, route: str, base: dict[str, Any], keys: list[str], tier: str = "client"
@@ -213,7 +227,7 @@ def default_plans(intake: dict[str, Any], *, sample_intake_paths: int = 12) -> l
             {**deploy, "responses": [deploy_response]},
             [],
         ),
-        plan("portfolio", "/v1/portfolio", {"intakes": [intake, intake]}, ["intakes"]),
+        plan("portfolio", "/v1/portfolio", {"intakes": [intake, second_hall]}, ["intakes"]),
         plan(
             "power_assess", "/v1/power/assess", {"intake": intake, "target_racks": 40}, ["intake"]
         ),
