@@ -189,13 +189,7 @@ def annotate(dotted, **fields):
     return mutated(edit)
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        *SHOWN,
-        *DROPPED,
-    ],  # GridForge-AI#110 is fixed: the six formerly dropped fields keep their source and note too
-)
+@pytest.mark.parametrize("path", [*SHOWN, *DROPPED])
 def test_an_annotated_figure_is_either_shown_with_its_source_or_refused(path):
     from gridforge_stress.product_adapter import call_batch
 

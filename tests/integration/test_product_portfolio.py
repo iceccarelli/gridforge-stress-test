@@ -1,7 +1,7 @@
 """The Portfolio Screen (/v1/portfolio) against screening each hall on its own.
 
-Independent expectations come from /v1/screen for each intake (the recommended scenario), never from the portfolio's own rows. The one open
-defect (the same hall listed twice is counted twice) is a strict xfail tied to GridForge-AI#112."""
+Independent expectations come from /v1/screen for each intake (the recommended scenario), never from the portfolio's own rows. The former
+open defect (the same hall listed twice was counted twice, GridForge-AI#112) is fixed in the product and is an ordinary regression."""
 
 from __future__ import annotations
 
