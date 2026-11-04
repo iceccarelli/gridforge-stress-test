@@ -47,7 +47,7 @@ jobs:
         run: |
           set -o pipefail
           uv run --locked gridforge-stress probe lbnl-queued-up --show-sheet "04. Data Codebook" --show-sheet "02. Data Sample by Region" --show-sheet "07. Active Capacity by Year" | tee probe-codebook.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: probe-report
