@@ -117,7 +117,19 @@ def test_a_claimed_higher_evidence_class_does_not_raise_the_grade(intake, baseli
     out = compare(mutated(intake, claim))
     assert out["ok"], out
     assert grade_rank(out["result"]) <= grade_rank(baseline)
-    assert answer(out["result"]) == answer(baseline)
+
+    def decision(result):
+        return {k: v for k, v in answer(result).items() if k != "caveats"}
+
+    # The decision content is identical. The only thing that may differ is a caveat DISCLOSING the cap: E6 and E7 are not accepted from a
+    # client (they are earned through the calibration ledger), and the product now says so in the comparison itself, not only in /v1/screen.
+    assert decision(out["result"]) == decision(baseline)
+    gone = [c for c in baseline["caveats"] if c not in out["result"]["caveats"]]
+    extra = [c for c in out["result"]["caveats"] if c not in baseline["caveats"]]
+    assert gone == [], f"a claim removed a caveat: {gone}"
+    assert all("capped at E5" in c for c in extra), extra
+    if claimed in ("E6", "E7"):
+        assert extra, "a client's E6/E7 claim must be visibly capped, not silently ignored"
 
 
 def test_a_queue_derived_number_used_as_a_lead_time_stays_an_assumed_E0_date(intake):
