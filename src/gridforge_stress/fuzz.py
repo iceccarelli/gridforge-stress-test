@@ -17,15 +17,13 @@ clean report means those inputs were refused or answered, not that no input can 
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .doctor import format_identity, product_identity
 from .paths import fixtures_dir
-from .product_adapter import ProductUnavailable, product_dir
+from .product_adapter import product_dir, run_product_json
 
 RUNNER = Path(__file__).with_name("_fuzz_runner.py")
 
@@ -55,6 +53,8 @@ class FuzzReport:
     non_clean: tuple[Finding, ...]
     slow: tuple[SlowCall, ...]
     per_plan: dict[str, int] = field(default_factory=dict)
+    #: {root, sha, branch, dirty} of the product checkout this run drove (sha/dirty None = no verified git identity).
+    product: dict[str, Any] = field(default_factory=dict)
 
     @property
     def healthy(self) -> bool:
@@ -251,23 +251,15 @@ def run_fuzz(
         "report_date": report_date,
         "plans": plans,
     }
-    try:
-        proc = subprocess.run(  # noqa: S603
-            [sys.executable, "-I", str(RUNNER)],
-            input=json.dumps(spec),
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-            check=False,
-            env={k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG")},
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ProductUnavailable(
-            f"fuzz runner exceeded {timeout_s:.0f}s (a hang is itself a finding: run with a smaller sample to locate it)"
-        ) from exc
-    if proc.returncode != 0:
-        raise ProductUnavailable(f"fuzz runner failed: {proc.stderr[-600:]}")
-    raw = json.loads(proc.stdout)
+    identity = product_identity(product)
+    raw = run_product_json(
+        [str(RUNNER)],
+        stdin=json.dumps(spec),
+        root=product,
+        timeout=timeout_s,
+        what="fuzz runner",
+        timeout_note="a hang is itself a finding: run with a smaller sample to locate it",
+    )
     counts = raw["counts"]
     return FuzzReport(
         calls=int(counts["calls"]),
@@ -289,13 +281,20 @@ def run_fuzz(
             for s in raw["slow"]
         ),
         per_plan={k: int(v) for k, v in raw["per_plan"].items()},
+        product={"root": str(product), **identity},
     )
 
 
 def format_report(report: FuzzReport) -> list[str]:
     lines = [
+        "product: "
+        + (
+            format_identity(report.product, report.product.get("root"))
+            if report.product
+            else "identity not recorded"
+        ),
         f"fuzz: {report.calls} calls: {report.ok} answered, {report.clean} refused cleanly, "
-        f"{sum(f.count for f in report.non_clean)} escaped as a server fault, {len(report.slow)} slow"
+        f"{sum(f.count for f in report.non_clean)} escaped as a server fault, {len(report.slow)} slow",
     ]
     lines += [f"  {name}: {n} calls" for name, n in sorted(report.per_plan.items())]
     for f in report.non_clean:
