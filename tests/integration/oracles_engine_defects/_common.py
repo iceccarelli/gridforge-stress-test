@@ -18,7 +18,13 @@ from typing import Any
 import pytest
 
 from gridforge_stress.paths import fixtures_dir
-from gridforge_stress.product_adapter import ProductUnavailable, call, product_dir, product_required
+from gridforge_stress.product_adapter import (
+    ProductUnavailable,
+    call,
+    call_batch,
+    product_dir,
+    product_required,
+)
 
 LIQUID_SCENARIOS = ("hybrid_dlc", "full_dlc", "full_dlc_btm")
 
@@ -72,19 +78,57 @@ def strings(node: Any) -> list[str]:
     return [v for _, v in leaves(node) if isinstance(v, str)]
 
 
-def ample_hall(busway_A: int, tapoff_A: int) -> dict[str, Any]:
-    """The reference hall with grid, transformer and UPS made ample, a 230 V single-phase feed (a GB300 rack then needs ~600 A) and 40 kW
-    of residual-air removal, so that only the LV chain (busway ampacity and tap-off rating) decides how many racks fit.
+ROUTES = {"compare": "/v1/compare", "screen": "/v1/screen", "diff": "/v1/diff"}
 
-    Only `lv.busway_ampacity_A` and `lv.tapoff_max_A` vary between the members of a family built from this."""
+
+def run_many(cases: dict[str, tuple[str, dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    """Run many (route name, body) cases through the real handlers in ONE interpreter. Rows: {status: ok|clean|fault, error?, message?,
+    result?}. 'clean' is what the HTTP layer turns into a 4xx, exactly as `gridforge-stress fuzz` classifies it."""
+    rows = call_batch(
+        [
+            {"id": k, "route": ROUTES[route], "tier": "client", "body": body, "want_result": True}
+            for k, (route, body) in cases.items()
+        ]
+    )
+    return rows
+
+
+def answered_many(cases: dict[str, tuple[str, dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    rows = run_many(cases)
+    out: dict[str, dict[str, Any]] = {}
+    for k, row in rows.items():
+        assert row["status"] == "ok", (
+            f"{k}: the product refused a hall the test needs answered: {row}"
+        )
+        out[k] = row["result"]
+    return out
+
+
+def ample_hall(
+    busway_A: int,
+    tapoff_A: int,
+    *,
+    voltage_V: int = 230,
+    phases: int = 1,
+    residual_air_kW: int = 40,
+) -> dict[str, Any]:
+    """The reference hall with grid, transformer and UPS made ample, a 230 V single-phase feed by default (a GB300 rack then needs ~600 A)
+    and 40 kW of residual-air removal, so that only the LV chain (busway ampacity and tap-off rating) decides how many racks fit.
+
+    Only the arguments vary between the members of a family built from this."""
     doc = reference_doc()
     doc["grid"].update(firm_capacity_MVA=60, contracted_MW=50, current_it_load_MW=1.0)
     doc["grid"]["current_site_peak_MW"] = 3.0
     doc["transformers"][0]["unit_rating_MVA"] = 30
     doc["ups"][0]["unit_rating_kW"] = 10000
     doc["hall"].update(rack_positions=2000, positions_available=1500)
-    doc["lv"].update(voltage_V=230, phases=1, busway_ampacity_A=busway_A, tapoff_max_A=tapoff_A)
-    doc["thermal"]["residual_air_capacity_kW_per_rack"] = {"value": 40, "evidence": "E3"}
+    doc["lv"].update(
+        voltage_V=voltage_V, phases=phases, busway_ampacity_A=busway_A, tapoff_max_A=tapoff_A
+    )
+    doc["thermal"]["residual_air_capacity_kW_per_rack"] = {
+        "value": residual_air_kW,
+        "evidence": "E3",
+    }
     return doc
 
 
