@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from .doctor import (
     product_checkout,
     product_child_env,
     product_override,
+    product_python_argv,
     stderr_digest,
 )
 
@@ -116,20 +118,22 @@ def run_product_json(
 
     Every way this can go wrong is a ProductUnavailable that names the interpreter, the root, the return code and the first and last
     stderr lines: a non-zero exit, a timeout, an OS error starting the interpreter, or stdout that is not JSON (stdout head included).
-    -B: the product tree is never written to (no .pyc), so the harness cannot make a clean checkout dirty.
+    -B: the product tree is never written to (no .pyc); -X pycache_prefix=<fresh empty dir>: no bytecode is ever READ from it either,
+    so a stale or planted .pyc cannot stand in for the source that the recorded identity describes.
     """
-    argv = [sys.executable, "-I", "-B", *argv_tail]
     ctx = f"interpreter={sys.executable} root={root}"
     try:
-        proc = subprocess.run(  # noqa: S603
-            argv,
-            input=stdin,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            env=product_child_env(),
-        )
+        with tempfile.TemporaryDirectory(prefix="gfs-pycache-") as prefix:
+            proc = subprocess.run(  # noqa: S603
+                [*product_python_argv(prefix), *argv_tail],
+                input=stdin,
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=timeout,
+                check=False,
+                env=product_child_env(),
+            )
     except subprocess.TimeoutExpired as exc:
         raise ProductUnavailable(
             f"{what} timed out after {timeout:.0f}s{' (' + timeout_note + ')' if timeout_note else ''}; {ctx}; {stderr_digest(exc.stderr)}"

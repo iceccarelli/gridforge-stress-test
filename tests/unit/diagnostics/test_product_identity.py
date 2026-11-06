@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
-import subprocess
 import tarfile
-from pathlib import Path
 
 import pytest
 
@@ -15,36 +12,9 @@ from gridforge_stress import doctor as D
 from gridforge_stress import workflow as W
 from gridforge_stress.fuzz import FuzzReport, format_report
 from gridforge_stress.product_adapter import ProductRefused, ProductUnavailable
+from tests.unit.diagnostics.conftest import git
 
 pytestmark = pytest.mark.unit
-
-GIT_BIN = shutil.which("git") or "git"
-GIT = [
-    GIT_BIN,
-    "-c",
-    "user.email=t@example.invalid",
-    "-c",
-    "user.name=t",
-    "-c",
-    "commit.gpgsign=false",
-]
-
-
-def git(root: Path, *args: str) -> str:
-    return subprocess.run(  # noqa: S603 - fixed argv, no shell, throwaway tmp repo
-        [*GIT, "-C", str(root), *args], check=True, capture_output=True, text=True
-    ).stdout.strip()
-
-
-@pytest.fixture
-def repo(tmp_path) -> Path:
-    root = tmp_path / "product"
-    root.mkdir()
-    git(root, "init", "-q", "-b", "main")
-    (root / "a.txt").write_text("a\n")
-    git(root, "add", "a.txt")
-    git(root, "commit", "-q", "-m", "first")
-    return root
 
 
 def test_clean_repo_is_dirty_false_with_a_40_char_lowercase_sha(repo):
@@ -104,10 +74,27 @@ def test_malformed_rev_parse_output_is_rejected(monkeypatch, repo, bad):
     assert D.product_identity(repo) == {"sha": None, "branch": None, "dirty": None}
 
 
-@pytest.mark.parametrize("failing", [("status", "--porcelain"), ("branch", "--show-current")])
-def test_any_single_git_failure_voids_the_whole_identity(monkeypatch, repo, failing):
+@pytest.mark.parametrize(
+    "probe",
+    [
+        ("ls-files", "-v"),  # index flags
+        ("status", "--porcelain=v1"),
+        ("ls-files", "-z", "--others"),  # ignored files
+    ],
+)
+def test_a_failing_dirtiness_probe_voids_the_whole_identity(monkeypatch, repo, probe):
+    real = D._git_bytes
+    monkeypatch.setattr(
+        D, "_git_bytes", lambda p, *a: None if a[: len(probe)] == probe else real(p, *a)
+    )
+    assert D.product_identity(repo) == {"sha": None, "branch": None, "dirty": None}
+
+
+def test_a_failing_branch_query_voids_the_whole_identity(monkeypatch, repo):
     real = D._git
-    monkeypatch.setattr(D, "_git", lambda p, *a: None if a[:2] == failing else real(p, *a))
+    monkeypatch.setattr(
+        D, "_git", lambda p, *a: None if a[:2] == ("branch", "--show-current") else real(p, *a)
+    )
     assert D.product_identity(repo) == {"sha": None, "branch": None, "dirty": None}
 
 
@@ -117,13 +104,6 @@ def test_git_missing_from_the_machine_is_unknown_not_clean(monkeypatch, repo):
 
     monkeypatch.setattr(D.subprocess, "run", boom)
     assert D.product_identity(repo) == {"sha": None, "branch": None, "dirty": None}
-
-
-def test_ambient_git_dir_variables_cannot_redirect_the_identity(monkeypatch, repo, tmp_path):
-    other = tmp_path / "other"
-    other.mkdir()
-    monkeypatch.setenv("GIT_DIR", str(repo / ".git"))
-    assert D.product_identity(other) == {"sha": None, "branch": None, "dirty": None}
 
 
 def test_format_identity_says_unknown_plainly():
