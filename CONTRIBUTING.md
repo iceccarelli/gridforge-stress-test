@@ -21,8 +21,9 @@ Small, labelled (`synthetic_fixture` with `SYNTHETIC` in limitations, or `source
 and enough provenance to reconstruct). Never commit raw downloads. Regenerate the manifest checksum when edited.
 
 ## Real-product tests on a runner
-`pytest -m product` needs a GridForge-AI checkout (`GRIDFORGE_PRODUCT_DIR`, default `../GridForge-AI`). The opt-in
-`product-integration` workflow checks out the public product repository at the ref you name and runs those tests;
+`pytest -m product` needs a GridForge-AI checkout (`GRIDFORGE_PRODUCT_DIR`, default `../GridForge-AI`). The
+`product-integration` workflow (push to `main`, nightly, or manual dispatch) checks out the public product repository at the exact SHA in
+`.product-pin` (or the dispatch input) and runs those tests plus the workflow oracle and the fuzz;
 it is read-only and needs no secret. If the product repository is made private, give its checkout step a `token:`
 backed by a read-only contents secret; do not add one while it is public.
 
