@@ -50,8 +50,11 @@ record names the engine build it judged, what the oracle cannot judge (`limitati
 the product owner (`open_questions`). The example pack is a synthetic hall that hosts racks under hybrid DLC today while
 full DLC needs facility-water relief. This oracle found, on product `main`, that an omitted transformer lead time became a
 silent 160-week placeholder that sets the date; that was fixed upstream (GridForge-AI PR 92) and the check now passes on product `main`.
-To run the product suite in CI, dispatch `product-integration` with `product_ref` set to a full 40-character commit SHA: a branch or tag is refused,
-because it is not a product identity.
+`product-integration` runs on push to `main` and nightly against the product commit pinned in `.product-pin` (one full 40-character SHA; moving it is
+a reviewed change), runs the product tests, the workflow oracle and the fuzz, uploads their records, and fails if the recorded product identity is
+dirty or has no SHA. Dispatch it with `product_ref` set to a full 40-character commit SHA to override the pin: a branch or tag is refused,
+because it is not a product identity. `gridforge-stress doctor` prints the product's exact `sha`, `branch` and `dirty` (unknown when git cannot say),
+and explains a missing checkout (raw `GRIDFORGE_PRODUCT_DIR` value, path tried, marker status, likely cause).
 
 ## First working example
 `tests/integration/test_product_ttp.py` feeds a synthetic reference hall through the product's real

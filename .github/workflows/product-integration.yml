@@ -1,16 +1,24 @@
 name: product-integration
 
-# Opt-in: runs the harness against the real GridForge-AI engine. Not part of ordinary CI.
-# Read-only: it checks out the product at the ref you name and runs `pytest -m product`; it never pushes,
-# deploys or changes the product. The product repository is public, so the default workflow token is enough
-# and no secret is needed. If it ever becomes private, add a `token:` input to the product checkout (a
-# read-only contents token stored as a repository secret); see CONTRIBUTING.md.
+# Runs the harness against the real GridForge-AI engine at ONE exact product commit, never a moving branch.
+#   * push to main and a nightly schedule: the product commit is the one pinned in the tracked `.product-pin` file
+#     (one line, a full 40-character SHA). Moving the pin is a reviewed change to this repository.
+#   * workflow_dispatch: the `product_ref` input, when given, overrides the pin.
+# Read-only: it checks out the product at that SHA and runs the product tests, the end-to-end workflow oracle and the
+# hostile-input fuzz; it never pushes, deploys or changes the product, and uses no secret. The product repository is
+# public, so the default workflow token is enough. If it ever becomes private, add a `token:` input to the product
+# checkout (a read-only contents token stored as a repository secret); see CONTRIBUTING.md.
 on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * *"
   workflow_dispatch:
     inputs:
       product_ref:
-        description: GridForge-AI FULL 40-character commit SHA to test against. A branch or tag is refused because it is not a product identity
-        required: true
+        description: GridForge-AI FULL 40-character commit SHA to test against (overrides .product-pin). A branch or tag is refused because it is not a product identity
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -18,31 +26,117 @@ permissions:
 jobs:
   product:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - name: Refuse anything but a full commit SHA
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Choose the product commit (dispatch input, else .product-pin) and refuse anything but a full SHA
+        id: pin
         env:
           PRODUCT_REF: ${{ inputs.product_ref }}
+        shell: bash
         run: |
-          if ! printf '%s' "$PRODUCT_REF" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "product_ref must be a full 40-character lowercase commit SHA, got: $PRODUCT_REF" >&2
+          ref="$PRODUCT_REF"
+          source="the workflow_dispatch input"
+          if [ -z "$ref" ]; then
+            # Only the trailing newline (command substitution) and a trailing CR are trimmed: a SHA split by whitespace is rejected.
+            ref="$(cat .product-pin)"
+            ref="${ref%$'\r'}"
+            source=".product-pin"
+          fi
+          case "$ref" in
+            *$'\n'*) echo "product ref (from $source) must be exactly one line" >&2; exit 1 ;;
+          esac
+          if ! printf '%s\n' "$ref" | grep -Ex '[0-9a-f]{40}' >/dev/null; then
+            echo "product ref (from $source) must be a full 40-character lowercase commit SHA, got: $ref" >&2
             exit 1
           fi
-      - uses: actions/checkout@v7
+          echo "product SHA $ref (from $source)"
+          echo "sha=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: iceccarelli/GridForge-AI
-          ref: ${{ inputs.product_ref }}
+          ref: ${{ steps.pin.outputs.sha }}
           path: GridForge-AI
           persist-credentials: false
       - name: Show exactly which commits are under test, and refuse a mismatch
         env:
-          PRODUCT_REF: ${{ inputs.product_ref }}
+          PRODUCT_REF: ${{ steps.pin.outputs.sha }}
         run: |
           git log -1 --format='harness %H (%s)'
           git -C GridForge-AI log -1 --format='product %H (%s)'
           test "$(git -C GridForge-AI rev-parse HEAD)" = "$PRODUCT_REF"
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --locked --all-groups
-      - run: uv run --locked pytest -m product -ra
+      - id: sync
+        run: uv sync --locked --all-groups
+      - name: Product tests
+        run: uv run --locked pytest -m product -ra
         env:
           GRIDFORGE_PRODUCT_DIR: ${{ github.workspace }}/GridForge-AI
+      - name: End-to-end workflow oracle (synthetic intake)
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress workflow data/fixtures/product/reference_hall_intake.json -o record.json | tee workflow-output.txt
+        env:
+          GRIDFORGE_PRODUCT_DIR: ${{ github.workspace }}/GridForge-AI
+      - name: Hostile-input fuzz
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked gridforge-stress fuzz | tee fuzz-report.txt
+        env:
+          GRIDFORGE_PRODUCT_DIR: ${{ github.workspace }}/GridForge-AI
+      - name: Record the product identity again after everything ran
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        shell: bash
+        run: |
+          uv run --locked python -c "import json; from gridforge_stress.doctor import current_product_identity as c; print(json.dumps(c()))" | tee identity-after.json
+        env:
+          GRIDFORGE_PRODUCT_DIR: ${{ github.workspace }}/GridForge-AI
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        with:
+          name: product-integration-${{ steps.pin.outputs.sha }}
+          path: |
+            record.json
+            workflow-output.txt
+            fuzz-report.txt
+            identity-after.json
+          if-no-files-found: warn
+      - name: Fail unless the product identity was exact, clean, and unchanged before and after
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        env:
+          PRODUCT_REF: ${{ steps.pin.outputs.sha }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          want = os.environ["PRODUCT_REF"]
+          problems = []
+
+          def check(label, ident):
+              print(label, json.dumps(ident))
+              if not ident.get("sha"):
+                  problems.append(f"{label}: sha is missing (no verified git identity)")
+              elif ident["sha"] != want:
+                  problems.append(f"{label}: sha {ident['sha']} is not the pinned {want}")
+              if ident.get("dirty") is not False:
+                  problems.append(f"{label}: dirty is {ident.get('dirty')!r}, not false")
+
+          before = json.load(open("record.json")).get("product_identity") or {}
+          after = json.load(open("identity-after.json"))
+          check("workflow record (before the fuzz)", before)
+          check("after the fuzz", after)
+          if before.get("sha") != after.get("sha") or before.get("dirty") != after.get("dirty"):
+              problems.append("the product identity changed during the run")
+          header = next((ln for ln in open("fuzz-report.txt") if ln.startswith("product: ")), "")
+          print("fuzz header:", header.strip())
+          if not re.search(rf" sha={want} .* dirty=False$", header.strip()):
+              problems.append("the fuzz report header does not show the pinned sha with dirty=False")
+          if problems:
+              sys.exit("product identity check failed: " + "; ".join(problems))
+          PY

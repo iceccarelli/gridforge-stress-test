@@ -8,13 +8,21 @@ what the supplied evidence can support.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
-from .doctor import product_checkout, product_override
+from .doctor import (
+    PRODUCT_ENV,
+    describe_product,
+    product_checkout,
+    product_child_env,
+    product_override,
+    product_python_argv,
+    stderr_digest,
+)
 
 _RUNNER = r"""
 import json, os, sys
@@ -67,7 +75,16 @@ MAX_GRADE = {
 
 
 class ProductUnavailable(RuntimeError):
-    pass
+    """The real product could not be run at all (missing, unimportable, hung, or its runner spoke nonsense)."""
+
+
+class ProductRefused(Exception):
+    """The product ran and REFUSED a request. Deliberately not a ProductUnavailable: a refusal is a judgement about the product's
+    behaviour, never "the product could not be reached"."""
+
+    def __init__(self, message: str, *, check_id: str | None = None) -> None:
+        super().__init__(message)
+        self.check_id = check_id
 
 
 def product_required() -> bool:
@@ -79,12 +96,63 @@ def product_dir() -> Path:
     p = product_checkout()
     if p is None:
         explicit = product_override()
-        raise ProductUnavailable(
-            f"GRIDFORGE_PRODUCT_DIR={explicit} is not a GridForge-AI checkout"
+        head = (
+            f"{PRODUCT_ENV}={explicit} is not a GridForge-AI checkout"
             if explicit
-            else "GridForge-AI checkout not found; set GRIDFORGE_PRODUCT_DIR"
+            else f"GridForge-AI checkout not found; set {PRODUCT_ENV}"
         )
+        raise ProductUnavailable(f"{head}\n{describe_product()}")
     return p
+
+
+def run_product_json(
+    argv_tail: list[str],
+    *,
+    stdin: str,
+    root: Path,
+    timeout: float,
+    what: str = "product runner",
+    timeout_note: str = "",
+) -> Any:
+    """Run `python -I -B <argv_tail>` as the product child and return its stdout parsed as JSON.
+
+    Every way this can go wrong is a ProductUnavailable that names the interpreter, the root, the return code and the first and last
+    stderr lines: a non-zero exit, a timeout, an OS error starting the interpreter, or stdout that is not JSON (stdout head included).
+    -B: the product tree is never written to (no .pyc); -X pycache_prefix=<fresh empty dir>: no bytecode is ever READ from it either,
+    so a stale or planted .pyc cannot stand in for the source that the recorded identity describes.
+    """
+    ctx = f"interpreter={sys.executable} root={root}"
+    try:
+        with tempfile.TemporaryDirectory(prefix="gfs-pycache-") as prefix:
+            proc = subprocess.run(  # noqa: S603
+                [*product_python_argv(prefix), *argv_tail],
+                input=stdin,
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=timeout,
+                check=False,
+                env=product_child_env(),
+            )
+    except subprocess.TimeoutExpired as exc:
+        raise ProductUnavailable(
+            f"{what} timed out after {timeout:.0f}s{' (' + timeout_note + ')' if timeout_note else ''}; {ctx}; {stderr_digest(exc.stderr)}"
+        ) from exc
+    except OSError as exc:
+        raise ProductUnavailable(
+            f"{what} could not be started: {type(exc).__name__}: {exc}; {ctx}"
+        ) from exc
+    if proc.returncode != 0:
+        raise ProductUnavailable(
+            f"{what} failed: return code {proc.returncode}; {ctx}; {stderr_digest(proc.stderr)}"
+        )
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise ProductUnavailable(
+            f"{what} wrote stdout that is not JSON ({exc.msg} at char {exc.pos}); {ctx}; "
+            f"return code {proc.returncode}; stdout head: {proc.stdout[:200]!r}; {stderr_digest(proc.stderr)}"
+        ) from exc
 
 
 ENDPOINTS = {
@@ -105,18 +173,12 @@ def call(
     """Run a real product endpoint handler. Returns {'ok': bool, 'result'|'error'|'message'}."""
     root = root or product_dir()
     route, handler = ENDPOINTS[endpoint]
-    proc = subprocess.run(  # noqa: S603
-        [sys.executable, "-I", "-c", _RUNNER, str(root), report_date, route, handler, tier],
-        input=json.dumps(body),
-        capture_output=True,
-        text=True,
+    parsed: dict[str, Any] = run_product_json(
+        ["-c", _RUNNER, str(root), report_date, route, handler, tier],
+        stdin=json.dumps(body),
+        root=root,
         timeout=120,
-        check=False,
-        env={k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG")},
     )
-    if proc.returncode != 0:
-        raise ProductUnavailable(f"product runner failed: {proc.stderr[-400:]}")
-    parsed: dict[str, Any] = json.loads(proc.stdout)
     return parsed
 
 
@@ -134,18 +196,12 @@ def call_batch(
     reproduced on the route where it escaped. Bodies travel as JSON (NaN/Infinity included, as Python's JSON parser accepts them).
     """
     root = root or product_dir()
-    proc = subprocess.run(  # noqa: S603
-        [sys.executable, "-I", "-c", _BATCH_RUNNER, str(root), report_date],
-        input=json.dumps(cases),
-        capture_output=True,
-        text=True,
+    rows: list[dict[str, Any]] = run_product_json(
+        ["-c", _BATCH_RUNNER, str(root), report_date],
+        stdin=json.dumps(cases),
+        root=root,
         timeout=timeout,
-        check=False,
-        env={k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG")},
     )
-    if proc.returncode != 0:
-        raise ProductUnavailable(f"product runner failed: {proc.stderr[-400:]}")
-    rows: list[dict[str, Any]] = json.loads(proc.stdout)
     return {r["id"]: r for r in rows}
 
 

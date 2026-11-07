@@ -176,7 +176,13 @@ def tool_product_call(args: Mapping[str, Any]) -> Any:
         result = call(endpoint, body, tier=args.get("tier", "client"))
     except ProductUnavailable as exc:
         raise ToolError(f"GridForge-AI product unavailable: {exc}") from exc
-    out: dict[str, Any] = {"endpoint": endpoint, "product_result": result}
+    from .doctor import current_product_identity
+
+    out: dict[str, Any] = {
+        "endpoint": endpoint,
+        "product_identity": current_product_identity(),
+        "product_result": result,
+    }
     level = args.get("evidence_level")
     if level and endpoint == "compare" and result.get("ok"):
         out["claim_violations"] = claim_violations(result["result"], level)

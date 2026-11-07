@@ -18,7 +18,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from .product_adapter import ProductUnavailable, call, claim_violations
+from .doctor import current_product_identity
+from .product_adapter import ProductRefused, ProductUnavailable, call, claim_violations
 
 PASS, FAIL, BLOCKED, UNCHECKED = "PASS", "FAIL", "BLOCKED", "UNCHECKED"
 
@@ -60,6 +61,8 @@ class Record:
     intake_sha256: str
     report_date: str
     product: dict[str, Any] = field(default_factory=dict)
+    #: {root, sha, branch, dirty} of the checkout under test, taken before any call. sha/dirty None = no verified git identity.
+    product_identity: dict[str, Any] = field(default_factory=dict)
     checks: list[Check] = field(default_factory=list)
     limitations: tuple[str, ...] = LIMITATIONS
     open_questions: tuple[str, ...] = OPEN_QUESTIONS
@@ -83,6 +86,7 @@ class Record:
             "intake_sha256": self.intake_sha256,
             "report_date": self.report_date,
             "product": self.product,
+            "product_identity": self.product_identity,
             "summary": self.counts(),
             "checks": [c.__dict__ for c in self.checks],
             "limitations": list(self.limitations),
@@ -551,6 +555,15 @@ def _first_transformer(doc: dict[str, Any]) -> dict[str, Any]:
     return doc["transformers"][0]  # type: ignore[no-any-return]
 
 
+WHATIF_CLAIMS = {
+    "whatif.identity": "an unchanged intake diffs to nothing",
+    "whatif.relief": "relieving a constraint never lowers capacity and diff agrees with compare",
+    "whatif.starved": "halving the grid connection never raises capacity and every bound still holds",
+    "whatif.determinism": "the same intake gives the same digest and answer; a changed one does not",
+    "whatif.missing_lead_time": "an omitted date-setting lead time is never silent: no date, or the compare says it was not supplied",
+}
+
+
 def evaluate_whatifs(
     intake: dict[str, Any],
     compare: dict[str, Any],
@@ -558,110 +571,131 @@ def evaluate_whatifs(
     report_date: str = "2026-10-27",
 ) -> list[Check]:
     res: list[Check] = []
+    stage = [next(iter(WHATIF_CLAIMS))]
 
     def cmp(doc: dict[str, Any]) -> dict[str, Any]:
         o = api("compare", {"intake": doc}, report_date=report_date)
         if not o.get("ok"):
-            raise ProductUnavailable(f"compare refused a what-if: {o.get('message')}")
+            raise ProductRefused(
+                f"compare refused a what-if: {o.get('message')}", check_id=stage[0]
+            )
         r: dict[str, Any] = o["result"]
         return r
 
     def diff(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         o = api("diff", {"before": a, "after": b}, report_date=report_date)
         if not o.get("ok"):
-            raise ProductUnavailable(f"diff refused: {o.get('message')}")
+            raise ProductRefused(f"diff refused: {o.get('message')}", check_id=stage[0])
         r: dict[str, Any] = o["result"]
         return r
 
-    same = diff(intake, intake)
-    p = (
-        []
-        if not same["material"] and same["racks_delta"] == 0 and not same["changed_inputs"]
-        else ["no-change diff"]
-    )
-    _check(res, "whatif.identity", "an unchanged intake diffs to nothing", p)
+    try:
+        same = diff(intake, intake)
+        p = (
+            []
+            if not same["material"] and same["racks_delta"] == 0 and not same["changed_inputs"]
+            else ["no-change diff"]
+        )
+        _check(res, "whatif.identity", "an unchanged intake diffs to nothing", p)
 
-    relieved = copy.deepcopy(intake)
-    _first_transformer(relieved)["units"] += 1
-    c2 = cmp(relieved)
-    d = diff(intake, relieved)
-    b, a = _best_racks(compare), _best_racks(c2)
-    p = []
-    if a < b:
-        p.append(f"more transformer capacity reduced racks {b} -> {a}")
-    if (d["before"]["racks_after_ladder"], d["after"]["racks_after_ladder"]) != (b, a):
-        p.append("diff and compare disagree on the recommended scenario's racks")
-    if d["racks_delta"] != a - b:
-        p.append(f"diff racks_delta {d['racks_delta']} != compare difference {a - b}")
-    if not any("transformer" in str(x) for x in d["changed_inputs"]):
-        p.append("diff does not name the transformer input it was given")
-    _check(
-        res,
-        "whatif.relief",
-        "relieving a constraint never lowers capacity and diff agrees with compare",
-        p,
-    )
+        stage[0] = "whatif.relief"
+        relieved = copy.deepcopy(intake)
+        _first_transformer(relieved)["units"] += 1
+        c2 = cmp(relieved)
+        d = diff(intake, relieved)
+        b, a = _best_racks(compare), _best_racks(c2)
+        p = []
+        if a < b:
+            p.append(f"more transformer capacity reduced racks {b} -> {a}")
+        if (d["before"]["racks_after_ladder"], d["after"]["racks_after_ladder"]) != (b, a):
+            p.append("diff and compare disagree on the recommended scenario's racks")
+        if d["racks_delta"] != a - b:
+            p.append(f"diff racks_delta {d['racks_delta']} != compare difference {a - b}")
+        if not any("transformer" in str(x) for x in d["changed_inputs"]):
+            p.append("diff does not name the transformer input it was given")
+        _check(
+            res,
+            "whatif.relief",
+            "relieving a constraint never lowers capacity and diff agrees with compare",
+            p,
+        )
 
-    starved = copy.deepcopy(intake)
-    starved["grid"]["firm_capacity_MVA"] = _num(intake["grid"]["firm_capacity_MVA"]) / 2
-    starved["grid"]["contracted_MW"] = _num(intake["grid"]["contracted_MW"]) / 2
-    c3 = cmp(starved)
-    nb, na = _best_racks(compare), _best_racks(c3)
-    p = [f"halving the connection raised racks {nb} -> {na}"] if na > nb else []
-    p += [
-        f"halved-connection result violates {c.id}"
-        for c in evaluate_compare(starved, c3)
-        if c.outcome == FAIL
-    ]
-    _check(
-        res,
-        "whatif.starved",
-        "halving the grid connection never raises capacity and every bound still holds",
-        p,
-    )
-
-    shuffled = {k: intake[k] for k in reversed(list(intake))}
-    c4 = cmp(shuffled)
-    p = (
-        []
-        if c4["request_digest"] == compare["request_digest"]
-        else ["request digest depends on key order"]
-    )
-    if c4["ranking"] != compare["ranking"]:
-        p.append("ranking depends on key order")
-    changed = cmp(relieved)["request_digest"]
-    if changed == compare["request_digest"]:
-        p.append("request digest did not change with the input")
-    _check(
-        res,
-        "whatif.determinism",
-        "the same intake gives the same digest and answer; a changed one does not",
-        p,
-    )
-
-    gap = copy.deepcopy(intake)
-    del _first_transformer(gap)["replacement_lead_time_weeks"]
-    c5 = cmp(gap)
-    relies = [
-        s["id"]
-        for s in c5["scenarios"]
-        if s["time_to_power"]["status"] == "dated"
-        and any(x["name"] == "Transformer capacity" for x in s["time_to_power"]["lead_times"])
-    ]
-    named = any(
-        "lead time" in c and "transformer" in c.lower() and "not supplied" in c
-        for c in c5["caveats"]
-    )
-    _check(
-        res,
-        "whatif.missing_lead_time",
-        "an omitted date-setting lead time is never silent: no date, or the compare says it was not supplied",
-        [
-            f"{', '.join(relies)} dated on a lead time the intake never supplied, with no caveat saying so"
+        stage[0] = "whatif.starved"
+        starved = copy.deepcopy(intake)
+        starved["grid"]["firm_capacity_MVA"] = _num(intake["grid"]["firm_capacity_MVA"]) / 2
+        starved["grid"]["contracted_MW"] = _num(intake["grid"]["contracted_MW"]) / 2
+        c3 = cmp(starved)
+        nb, na = _best_racks(compare), _best_racks(c3)
+        p = [f"halving the connection raised racks {nb} -> {na}"] if na > nb else []
+        p += [
+            f"halved-connection result violates {c.id}"
+            for c in evaluate_compare(starved, c3)
+            if c.outcome == FAIL
         ]
-        if relies and not named
-        else [],
-    )
+        _check(
+            res,
+            "whatif.starved",
+            "halving the grid connection never raises capacity and every bound still holds",
+            p,
+        )
+
+        stage[0] = "whatif.determinism"
+        shuffled = {k: intake[k] for k in reversed(list(intake))}
+        c4 = cmp(shuffled)
+        p = (
+            []
+            if c4["request_digest"] == compare["request_digest"]
+            else ["request digest depends on key order"]
+        )
+        if c4["ranking"] != compare["ranking"]:
+            p.append("ranking depends on key order")
+        changed = cmp(relieved)["request_digest"]
+        if changed == compare["request_digest"]:
+            p.append("request digest did not change with the input")
+        _check(
+            res,
+            "whatif.determinism",
+            "the same intake gives the same digest and answer; a changed one does not",
+            p,
+        )
+
+        stage[0] = "whatif.missing_lead_time"
+        gap = copy.deepcopy(intake)
+        del _first_transformer(gap)["replacement_lead_time_weeks"]
+        c5 = cmp(gap)
+        relies = [
+            s["id"]
+            for s in c5["scenarios"]
+            if s["time_to_power"]["status"] == "dated"
+            and any(x["name"] == "Transformer capacity" for x in s["time_to_power"]["lead_times"])
+        ]
+        named = any(
+            "lead time" in c and "transformer" in c.lower() and "not supplied" in c
+            for c in c5["caveats"]
+        )
+        _check(
+            res,
+            "whatif.missing_lead_time",
+            "an omitted date-setting lead time is never silent: no date, or the compare says it was not supplied",
+            [
+                f"{', '.join(relies)} dated on a lead time the intake never supplied, with no caveat saying so"
+            ]
+            if relies and not named
+            else [],
+        )
+    except ProductRefused as exc:
+        # The what-if is a minimal, valid edit of an intake the product already accepted. Its refusal is a result about the
+        # product (a FAIL, like a refused intake), not "the product could not be called"; the what-ifs after it were not run.
+        failed = exc.check_id or stage[0]
+        res.append(
+            Check(failed, FAIL, WHATIF_CLAIMS.get(failed, failed), f"product refused: {exc}")
+        )
+        ids = list(WHATIF_CLAIMS)
+        res += [
+            Check(i, UNCHECKED, WHATIF_CLAIMS[i], f"not run: {failed} was refused by the product")
+            for i in ids[ids.index(failed) + 1 :]
+            if failed in ids
+        ]
     return res
 
 
@@ -674,6 +708,7 @@ def run(
     rec = Record(
         intake_sha256=hashlib.sha256(json.dumps(intake, sort_keys=True).encode()).hexdigest(),
         report_date=report_date,
+        product_identity=current_product_identity(),
     )
     try:
         first = api("compare", {"intake": intake}, report_date=report_date)
@@ -711,6 +746,15 @@ def run(
         rec.checks += evaluate_whatifs(intake, compare, api, report_date)
         rec.checks += evaluate_queue_context(intake, compare, api, report_date)
         rec.checks += evaluate_price_context(intake, compare, api, report_date)
+    except ProductRefused as exc:
+        rec.checks.append(
+            Check(
+                exc.check_id or "product.refused",
+                FAIL,
+                "the product answers requests derived from an intake it accepted",
+                f"product refused: {exc}",
+            )
+        )
     except ProductUnavailable as exc:
         rec.checks.append(
             Check(
