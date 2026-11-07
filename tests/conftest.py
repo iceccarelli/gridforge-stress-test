@@ -22,3 +22,18 @@ def enable(source_id: str, **overrides: Any) -> dict[str, Source]:
 @pytest.fixture
 def public_ip_resolver():
     return lambda host: ["93.184.216.34"]
+
+
+def pytest_report_header(config: pytest.Config) -> list[str]:
+    """Say which product checkout (exact commit, clean or dirty) the run is about, so a green run names what it tested."""
+    from gridforge_stress.doctor import (
+        describe_product,
+        format_identity,
+        product_checkout,
+        product_identity,
+    )
+
+    root = product_checkout()
+    if root is None:
+        return ["gridforge product: not found (" + describe_product().splitlines()[0] + ")"]
+    return ["gridforge product: " + format_identity(product_identity(root), root)]

@@ -45,16 +45,49 @@ def outside_echo_and_warnings(node, path=""):
         yield node
 
 
-@pytest.mark.parametrize("declared", ["E6", "E7", "e7", "E7 validated", "E6_CALIBRATED"])
-def test_a_client_cannot_declare_validation_level_evidence(declared):
-    """With 0 calibration observations no quantity may be E6/E7, however the intake spells it; the buyer is told it was capped."""
-    out = run("/v1/screen", {"intake": with_peak(evidence=declared)})
+def _assert_validation_level_is_never_honoured(out):
     assert "0 reconciled observations" in out["calibration"]["statement"], (
         "premise: the calibration ledger is empty"
     )
     leaks = [s[:100] for s in outside_echo_and_warnings(out) if re.search(r"\bE[67]\b", s)]
     assert not leaks, leaks
     assert any("capped at E5" in w for w in out["intake"]["warnings"]), out["intake"]["warnings"]
+
+
+#: Spellings the product itself emits or documents: the bare codes and its canonical enum names (public/reference/model_pack.json carries
+#: "E0_ASSUMPTION"-style values, so a client re-submitting the product's own pack must be understood). They are ACCEPTED and capped at E5.
+@pytest.mark.parametrize("declared", ["E6", "E7", "e7", "E6_FIELD_VALIDATED", "E7_DEPLOYED"])
+def test_a_client_cannot_declare_validation_level_evidence(declared):
+    """With 0 calibration observations no quantity may be E6/E7, however the intake spells it; the buyer is told it was capped."""
+    _assert_validation_level_is_never_honoured(
+        run("/v1/screen", {"intake": with_peak(evidence=declared)})
+    )
+
+
+#: Free-text spellings that are NOT an evidence class. History: the product once read any string by its first two characters, so 'E10' became E1
+#: and 'E39' became E3 (silent mis-classification); the product now reads exactly one of the eight codes or eight canonical names. For these
+#: spellings the invariant that matters is unchanged -- the client's E6/E7 claim must never be honoured -- and a clean refusal that names the
+#: field satisfies it just as a capped acceptance does. Both outcomes are asserted; a server fault, or an acceptance without the cap, is a FAIL.
+@pytest.mark.parametrize("declared", ["E7 validated", "E6_CALIBRATED"])
+def test_a_non_canonical_validation_level_spelling_is_capped_or_refused_never_honoured(declared):
+    from gridforge_stress.product_adapter import call_batch
+
+    r = call_batch(
+        [
+            {
+                "id": "x",
+                "route": "/v1/screen",
+                "tier": "client",
+                "body": {"intake": with_peak(evidence=declared)},
+                "want_result": True,
+            }
+        ]
+    )["x"]
+    if r["status"] == "ok":
+        _assert_validation_level_is_never_honoured(r["result"])
+    else:
+        assert r["status"] == "clean", r  # a refusal with a message, never a server fault
+        assert "current_site_peak_MW" in str(r.get("message")), r
 
 
 def test_the_hostile_declarations_are_still_refused_when_not_an_evidence_class():
