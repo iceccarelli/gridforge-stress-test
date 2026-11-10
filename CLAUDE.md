@@ -6,7 +6,7 @@ Time-to-Power product. It is NOT a second implementation of the product.
 ## Layout
 - `src/gridforge_stress/`: `registry` (schema-validated sources/scenarios), `fetch` (safe acquisition),
   `manifest` (provenance + atomic snapshots), validators per scenario (`queue`, `poi`, `hourly`, `ercot`,
-  `scenarios_data`), `evidence` (sufficiency rubric), `product_adapter` (real product boundary), `context_bridge` (queue history beside the product's assumption), `workflow` (end-to-end oracle over the real compare/screen/diff journey), `mcp_server` (agent interface), `xlsx_peek` (bounded workbook reader), `doctor`, `cli`.
+  `scenarios_data`), `evidence` (sufficiency rubric), `product_adapter` (real product boundary), `context_bridge` (queue history beside the product's assumption), `workflow` (end-to-end oracle over the real compare/screen/diff journey), `mcp_server` (agent interface), `assumed_fields` + `annotated_intake` (pure judges for `/v1/qualify` `assumed_fields`, its capability flag, completeness and annotated integer figures), `xlsx_peek` (bounded workbook reader), `doctor`, `cli`.
 - `configs/` registry + catalogue; `schemas/` JSON Schemas (versioned `.../1`); `data/fixtures/` labelled fixtures.
 - Tests: `tests/unit`, `tests/contracts`, `tests/integration`. Markers: unit, contract, integration, product, live.
 
