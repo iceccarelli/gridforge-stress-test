@@ -64,6 +64,46 @@ for case in json.load(sys.stdin):
 json.dump(out, sys.stdout, default=str)
 """
 
+#: Drives requests through the product's REAL HTTP handler (`gridforge.api.server.Handler`), served on a loopback port in this child interpreter
+#: only, so a status code is the status code a caller would see (a 500 is a 500, not "an exception the batch runner classified"), and the time of
+#: each request includes parsing, routing and serialising. The product's own per-IP rate limit is switched off for this private server (as its own
+#: tests do); nothing is metered and no other host is contacted. Each request is {id, method, path, json? | raw?}: `raw` is the exact body text.
+_HTTP_RUNNER = r"""
+import json, os, sys, time, threading, http.client
+sys.path.insert(0, sys.argv[1])
+os.environ["GRIDFORGE_REPORT_DATE"] = sys.argv[2]
+os.environ["GRIDFORGE_RATE_LIMIT"] = "0"
+os.environ["GRIDFORGE_DISCOVERY_RATE_LIMIT"] = "0"
+from gridforge.api import server
+server.Handler.limiter.per_minute = 0
+httpd = server.make_server("127.0.0.1", 0)
+threading.Thread(target=httpd.serve_forever, daemon=True).start()
+port = httpd.server_address[1]
+out = []
+for req in json.load(sys.stdin):
+    body = None
+    if "raw" in req:
+        body = req["raw"].encode("utf-8", "surrogatepass")
+    elif "json" in req:
+        body = json.dumps(req["json"]).encode()
+    headers = {"Content-Type": "application/json"} if body is not None else {}
+    started = time.monotonic()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
+        conn.request(req["method"], req["path"], body=body, headers=headers)
+        resp = conn.getresponse()
+        data = resp.read(4_000_000)
+        row = {"id": req["id"], "status": resp.status, "content_type": resp.getheader("Content-Type") or "",
+               "body": data.decode("utf-8", "replace")}
+        conn.close()
+    except Exception as exc:
+        row = {"id": req["id"], "status": -1, "content_type": "", "body": f"{type(exc).__name__}: {exc}"[:300]}
+    row["elapsed_s"] = round(time.monotonic() - started, 4)
+    out.append(row)
+httpd.shutdown()
+json.dump(out, sys.stdout)
+"""
+
 GRADE_ORDER = ("undated", "indicative", "screening")
 #: Highest product grade the harness lets a claim carry at each evidence level (see evidence.assess).
 MAX_GRADE = {
@@ -199,6 +239,28 @@ def call_batch(
     rows: list[dict[str, Any]] = run_product_json(
         ["-c", _BATCH_RUNNER, str(root), report_date],
         stdin=json.dumps(cases),
+        root=root,
+        timeout=timeout,
+    )
+    return {r["id"]: r for r in rows}
+
+
+def http_batch(
+    requests: list[dict[str, Any]],
+    *,
+    report_date: str = "2026-10-27",
+    root: Path | None = None,
+    timeout: int = 600,
+) -> dict[str, dict[str, Any]]:
+    """Send `requests` ({id, method, path, json? | raw?}) to the product's real HTTP handler, in order, on a private loopback server.
+
+    Returns {id: {status, content_type, body (text), elapsed_s}}; status -1 means the connection itself failed (body says how). A body
+    is the exact bytes a caller would read, not parsed, so a test can judge the status line, the type and the text separately.
+    """
+    root = root or product_dir()
+    rows: list[dict[str, Any]] = run_product_json(
+        ["-c", _HTTP_RUNNER, str(root), report_date],
+        stdin=json.dumps(requests),
         root=root,
         timeout=timeout,
     )
