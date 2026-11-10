@@ -59,6 +59,15 @@ def test_the_flag_is_true_if_and_only_if_the_route_honours_the_parameter(observe
     )
 
 
+def test_the_product_supports_the_round3_baseline(observed):
+    """Honest absence is not enough: the round-3 suite needs a product that implements assumed_fields."""
+    caps = observed["version"].get("capabilities") or {}
+    assert caps.get("qualify_assumed_fields") is True, (
+        "The round-3 suite requires assumed_fields support; check .product-pin or GRIDFORGE_PRODUCT_DIR"
+    )
+    assert honouring(observed["plain"], observed["marked"]) == "full"
+
+
 def test_the_probe_sees_the_capability_as_whole_not_partial(observed):
     """The probe's own verdict on the shipped route, stated apart from the flag: if this is not 'full' or 'none' the flag test cannot pass."""
     assert honouring(observed["plain"], observed["marked"]) in ("full", "none")
