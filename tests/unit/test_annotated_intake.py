@@ -107,6 +107,75 @@ def test_every_difference_the_annotation_must_not_make_is_flagged(plain, annotat
     assert parity_violations("t", plain, annotated, PATH)
 
 
+def with_gaps(
+    res: dict[str, Any], *, issue: bool, sentence: str, rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    res = copy.deepcopy(res)
+    res["intake"].update(can_issue_a_study=issue, recommended_engagement=sentence, gaps=rows)
+    return res
+
+
+OPEN_ROW = {
+    "path": PATH,
+    "required": True,
+    "assumed": "180, declared as an assumption (E0): it counts as open",
+}
+READY = "No required inputs are missing, so this supports a full Study."
+OPEN = "1 required input was sent but declared as an assumption (class E0), not the hall's own figure, so it counts as open."
+
+
+def declared_e0(**over: Any) -> dict[str, Any]:
+    """A correct answer to a required figure annotated E0: its one open row, the Study not issuable, the sentence says so."""
+    return with_gaps(
+        result(),
+        issue=over.get("issue", False),
+        sentence=over.get("sentence", OPEN),
+        rows=over.get("rows", [OPEN_ROW]),
+    )
+
+
+def plain_ready() -> dict[str, Any]:
+    return with_gaps(result(), issue=True, sentence=READY, rows=[])
+
+
+def test_a_required_figure_declared_e0_may_open_its_row_and_close_the_study_and_nothing_else():
+    assert parity_violations("t", ok(plain_ready()), ok(declared_e0()), PATH, (PATH,)) == []
+
+
+@pytest.mark.parametrize(
+    "annotated",
+    [
+        declared_e0(issue=True),  # the Study stays issuable on an assumption
+        declared_e0(sentence=READY),  # the sentence does not say so
+        declared_e0(rows=[{**OPEN_ROW, "required": False}]),  # the row is not required
+        declared_e0(
+            rows=[{**OPEN_ROW, "assumed": "180"}]
+        ),  # the row does not say it is an assumption
+        declared_e0(rows=[OPEN_ROW, dict(OPEN_ROW)]),  # listed twice
+        declared_e0(
+            rows=[OPEN_ROW, {"path": "transformers", "required": True}]
+        ),  # a second, unrelated row
+    ],
+)
+def test_the_open_assumption_allowance_is_bounded(annotated):
+    assert parity_violations("t", ok(plain_ready()), ok(annotated), PATH, (PATH,))
+
+
+def test_the_allowance_is_only_for_a_figure_declared_e0_that_the_product_opened():
+    # the same differences with the figure declared at another class, or with no declaration, are changes the annotation must not make
+    assert parity_violations("t", ok(plain_ready()), ok(declared_e0()), PATH)
+    assert parity_violations("t", ok(plain_ready()), ok(declared_e0()), PATH, ())
+    # a figure that is not required gets no allowance: no row was added, so a flipped readiness is a difference
+    flipped = with_gaps(result(), issue=False, sentence=OPEN, rows=[])
+    assert parity_violations("t", ok(plain_ready()), ok(flipped), PATH, (PATH,))
+
+
+def test_the_allowance_does_not_hide_a_changed_number():
+    wrong = declared_e0()
+    wrong["scenarios"][0]["constraints"][0]["racks_permitted"] = 179
+    assert parity_violations("t", ok(plain_ready()), ok(wrong), PATH, (PATH,))
+
+
 def doc(*rows: str) -> str:
     return (
         "## 4\n\nFigures supplied with a source. These are the client's own data.\n\n| Input | Value | Evidence | Source | Note |\n| --- | --- | --- | --- | --- |\n"

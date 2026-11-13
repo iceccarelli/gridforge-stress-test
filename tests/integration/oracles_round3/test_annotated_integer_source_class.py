@@ -30,6 +30,7 @@ from typing import Any
 import pytest
 
 from gridforge_stress.annotated_intake import (
+    declared_rank,
     parity_violations,
     recorded_class_violations,
     refusal_violations,
@@ -115,7 +116,11 @@ def test_an_annotated_figure_gives_the_answer_of_the_bare_number(answers, route,
     problems = []
     for c in CLASSES:
         problems += parity_violations(
-            f"{route} {path} {c}", plain, answers[f"{route}|{path}|cls={c}"], path
+            f"{route} {path} {c}",
+            plain,
+            answers[f"{route}|{path}|cls={c}"],
+            path,
+            (path,) if declared_rank(c) == 0 else (),
         )
     for tag in ("no class", "source only", "float value"):
         problems += parity_violations(

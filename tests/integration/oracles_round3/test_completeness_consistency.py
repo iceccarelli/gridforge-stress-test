@@ -5,14 +5,15 @@ CONSISTENCY oracle over every response that reports a completeness: the `intake`
 The score is judged only against the lists in the SAME response, never against a count computed here (the denominator is the product's).
 
 Invariants:
-  1. WITHIN a response: completeness is a finite fraction in [0, 1]; 1.0 never appears with a REQUIRED gap listed or a non-zero
-     `required_inputs_missing`; a score below 1.0 lists at least one gap; `required_inputs_missing` equals the number of gaps listed as required;
-     `can_issue_a_study` is true exactly when no required gap is listed.
+  1. WITHIN a response: completeness is a finite fraction in [0, 1]; 1.0 never appears with a REQUIRED gap listed (a declared-assumed figure's apart) or a non-zero
+     `required_inputs_missing`; a score below 1.0 lists at least one gap; `required_inputs_missing` equals the number of gaps listed as required (a declared-assumed figure's row apart: it was sent);
+     `can_issue_a_study` is true exactly when no required gap is listed, a declared one included.
   2. ACROSS requests for the same hall with figures withheld one at a time or in groups: a response that lists a strict subset of another's gap
      paths never scores lower; two responses that list the same gaps score the same.
   3. ASSUMING: declaring more of the same figures assumed never raises completeness (the product documents that it leaves it unchanged, because
      a declared figure was supplied, and says so in `assumed_count_note`; the oracle asserts only the direction a product could not defend
-     breaking), and never removes a listed gap or adds one.
+     breaking), and never removes a listed gap. It adds exactly one, the declared figure itself, as an open REQUIRED input (the product's rule: a
+     required input declared an assumption is open, so the Study is not issuable); `required_inputs_missing` counts what was not sent and leaves it out.
   4. ACROSS ROUTES: /v1/screen and /v1/compare report one completeness for one intake.
 Judges: `assumed_fields.completeness_violations` and `completeness_family_violations`; unit proofs in tests/unit/test_assumed_fields.py. Not xfail'd.
 """
@@ -26,6 +27,7 @@ import pytest
 from gridforge_stress.assumed_fields import (
     completeness_family_violations,
     completeness_violations,
+    declared_paths,
     gap_paths,
     intake_blocks,
 )
@@ -81,7 +83,11 @@ def qualify():
 
 def test_every_qualify_response_agrees_with_its_own_lists(qualify):
     problems = [
-        f"{k}: {p}" for k, (_, block) in qualify.items() for p in completeness_violations(block)
+        f"{k}: {p}"
+        for k, (body, block) in qualify.items()
+        for p in completeness_violations(
+            block, frozenset(declared_paths(body.get("assumed_fields")))
+        )
     ]
     assert not problems, "; ".join(problems[:6])
 
@@ -105,15 +111,20 @@ def test_declaring_more_assumed_never_raises_completeness_or_changes_the_gaps(qu
     problems: list[str] = []
     for sent, blocks in groups.items():
         plain = blocks[""]
-        counts = {d: (len(d.split("+")) if d else 0) for d in blocks}
+        names = {d: [f for f in d.split("+") if f] for d in blocks}
+        counts = {d: len(names[d]) for d in blocks}
         problems += [f"{sent}: {p}" for p in completeness_family_violations(blocks, counts)]
         for declared, block in blocks.items():
             if block["completeness"] > plain["completeness"]:
                 problems.append(
                     f"{sent}#{declared}: declaring raised completeness {plain['completeness']} -> {block['completeness']}"
                 )
-            if gap_paths(block) != gap_paths(plain):
-                problems.append(f"{sent}#{declared}: declaring changed the listed gaps")
+            expected = gap_paths(plain) | declared_paths(names[declared])
+            if gap_paths(block) != expected:
+                problems.append(
+                    f"{sent}#{declared}: declaring changed the listed gaps by more than the declared figures: "
+                    f"{sorted(gap_paths(block) ^ expected)[:4]}"
+                )
             if declared and block.get("assumed_count") != counts[declared]:
                 problems.append(f"{sent}#{declared}: assumed_count {block.get('assumed_count')!r}")
     assert not problems, "; ".join(problems[:6])

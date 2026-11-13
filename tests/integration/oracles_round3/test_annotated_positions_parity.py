@@ -34,7 +34,11 @@ from typing import Any
 
 import pytest
 
-from gridforge_stress.annotated_intake import parity_violations, zero_occupied_violations
+from gridforge_stress.annotated_intake import (
+    declared_rank,
+    parity_violations,
+    zero_occupied_violations,
+)
 
 from ..oracles_engine_defects._common import reference_doc
 from ._intake import annotate, rows_for, set_path, without
@@ -125,7 +129,13 @@ def test_annotated_position_counts_give_the_capacity_of_the_bare_counts(parity, 
         field = "hall.rack_positions" if which.startswith("total") else "hall.positions_available"
         if which.startswith("both"):
             field = "hall."  # both are annotated: any line the annotation adds names one of them
-        problems += parity_violations(key, parity[f"{tag}|plain"], row, field)
+        # the intake paths this case declared at E0 (a required free count declared an assumption is open, which the judge allows for and checks)
+        e0 = (declared_rank(which.split("=", 1)[1]) == 0) and {
+            "free": ("hall.positions_available",),
+            "total": ("hall.rack_positions",),
+            "both": ("hall.positions_available", "hall.rack_positions"),
+        }.get(which.split("=", 1)[0], ())
+        problems += parity_violations(key, parity[f"{tag}|plain"], row, field, e0 or ())
     assert not problems, f"{len(problems)} problems: " + "; ".join(problems[:6])
 
 

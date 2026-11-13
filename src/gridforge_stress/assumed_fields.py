@@ -57,6 +57,118 @@ def without_additions(response: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+#: The readiness fields of an `intake` block. A required figure declared assumed is OPEN (the product's rule, stated in its loader: "a required input that
+#: was sent but declared an assumption (class E0) is a template's value and not this hall's"), so declaring it may move exactly these, and the one gap row
+#: that names it. They are judged on their own (`open_declared_violations`), not by equality with the undeclared answer.
+READINESS_KEYS = ("can_issue_a_study", "recommended_engagement")
+
+
+def declared_paths(declared: Any) -> set[str]:
+    """The intake paths of the qualify figures a request declared assumed (names the qualifier does not take are ignored here: the route refuses them)."""
+    if not isinstance(declared, list):
+        return set()
+    return {
+        QUALIFY_ENGINE_PATH[f] for f in declared if isinstance(f, str) and f in QUALIFY_ENGINE_PATH
+    }
+
+
+def _gaps_of(response: dict[str, Any]) -> list[dict[str, Any]]:
+    block = response.get("intake")
+    rows = block.get("gaps") if isinstance(block, dict) else None
+    return [g for g in rows if isinstance(g, dict)] if isinstance(rows, list) else []
+
+
+def _open_rows(
+    plain: dict[str, Any], annotated: dict[str, Any], paths: set[str]
+) -> dict[str, list[dict[str, Any]]]:
+    """Per declared path, the rows `annotated` lists for it that `plain` did not: a declared required figure is listed once, as an open required input."""
+    before = {g.get("path") for g in _gaps_of(plain)}
+    return {
+        p: [g for g in _gaps_of(annotated) if g.get("path") == p]
+        for p in sorted(paths)
+        if p not in before
+    }
+
+
+def without_open_declared(
+    plain: dict[str, Any], annotated: dict[str, Any], paths: set[str]
+) -> dict[str, Any]:
+    """`annotated` with the gap row of each declared figure taken out (only a row `plain` did not list, only a required one) and the readiness fields
+    taken out of its `intake` block: what is left is what a declaration is not allowed to change. Everything else is kept, so a row that is wrong in
+    any other way, or a second row, still shows."""
+    rows = _open_rows(plain, annotated, paths)
+    drop = {id(g) for found in rows.values() for g in found[:1] if g.get("required") is True}
+    out = dict(annotated)
+    block = annotated.get("intake")
+    if isinstance(block, dict):
+        kept = (
+            [g for g in block["gaps"] if id(g) not in drop]
+            if isinstance(block.get("gaps"), list)
+            else block.get("gaps")
+        )
+        out["intake"] = {k: v for k, v in block.items() if k not in READINESS_KEYS}
+        if kept is not None:
+            out["intake"]["gaps"] = kept
+    return out
+
+
+def without_readiness(response: dict[str, Any]) -> dict[str, Any]:
+    """The same for the undeclared answer: its `intake` block without the readiness fields."""
+    block = response.get("intake")
+    if not isinstance(block, dict):
+        return response
+    return {**response, "intake": {k: v for k, v in block.items() if k not in READINESS_KEYS}}
+
+
+def added_open_paths(paths: set[str], plain: dict[str, Any], annotated: dict[str, Any]) -> set[str]:
+    """The declared paths among `paths` for which `annotated` lists a gap row `plain` did not: the figures the product treated as open required inputs."""
+    return {p for p, rows in _open_rows(plain, annotated, paths).items() if rows}
+
+
+def open_paths_violations(
+    paths: set[str], plain: dict[str, Any], annotated: dict[str, Any]
+) -> list[str]:
+    """What declaring the figures at `paths` assumed does to the readiness of the answer. Empty means the product's rule holds on this pair.
+
+    EVALUATES, for each path the undeclared answer did not already list as a gap: it is listed ONCE, as a REQUIRED gap, with an `assumed` text that
+    says it is an assumption; the Study is not issuable (`can_issue_a_study` is false); the readiness sentence says an assumption is open.
+    DOES NOT EVALUATE whether that rule is the right one, nor the figures' completeness (that is judged elsewhere).
+    """
+    if not paths:
+        return []
+    out: list[str] = []
+    for path, rows in _open_rows(plain, annotated, paths).items():
+        if len(rows) != 1:
+            out.append(
+                f"{path} was declared assumed but the answer lists {len(rows)} gap rows for it, not one"
+            )
+            continue
+        if rows[0].get("required") is not True:
+            out.append(f"{path} was declared assumed but its gap row is not marked required")
+        if "assum" not in str(rows[0].get("assumed", "")).lower():
+            out.append(
+                f"{path} was declared assumed but its gap row does not say it is an assumption: {str(rows[0].get('assumed'))[:80]!r}"
+            )
+    raw = annotated.get("intake")
+    block: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    if block.get("can_issue_a_study") is not False:
+        out.append(
+            f"{sorted(paths)} declared assumed but can_issue_a_study is {block.get('can_issue_a_study')!r}: the Study must not be issuable on an assumption"
+        )
+    if "assum" not in str(block.get("recommended_engagement", "")).lower():
+        out.append(
+            "a figure was declared assumed but the readiness sentence (recommended_engagement) does not mention an assumption"
+        )
+    return out
+
+
+def open_declared_violations(
+    declared: Any, plain: dict[str, Any], annotated: dict[str, Any]
+) -> list[str]:
+    """`open_paths_violations` for the qualify figures a request named in `assumed_fields`: every one of the seven is a required input."""
+    return open_paths_violations(declared_paths(declared), plain, annotated)
+
+
 def class_ranks(node: Any, path: str = "") -> dict[str, tuple[int, ...]]:
     """Every evidence class the response states, keyed by where: an `evidence` value is one rank, a text with '(E5)' tags is its tags in order."""
     out: dict[str, tuple[int, ...]] = {}
@@ -121,7 +233,8 @@ def annotation_violations(
     """Where `annotated` (the answer to `request`, which carries `assumed_fields`) breaks the declaration contract against `plain` (the answer
     to the same request without the key). Empty means the contract holds on this pair.
 
-    EVALUATES, for the declared set D: (1) the engineering answer is identical, class labels and the keys a declaration adds aside; (2) no stated
+    EVALUATES, for the declared set D: (0) each declared figure is an open required input (`open_declared_violations`); (1) the engineering answer is
+    identical, class labels, the keys a declaration adds and the gap row and readiness fields of (0) aside; (2) no stated
     class is higher than in `plain`, at any path, and the same paths state a class; (3) `inputs_declared_assumed` lists exactly D, once each, in
     the qualifier's order, each with the figure the request sent and class E0; (4) `intake.assumed_count` equals |D| and explains itself.
     With D empty: the answer is IDENTICAL to `plain` and carries none of the added keys.
@@ -129,12 +242,18 @@ def annotation_violations(
     """
     declared = request.get("assumed_fields") or []
     out: list[str] = []
-    stripped = without_additions(annotated)
-    if (
-        diff := first_difference(class_free(without_additions(plain)), class_free(stripped))
-    ) is not None:
+    paths = declared_paths(declared)
+    out += open_declared_violations(declared, plain, annotated)
+    # What is compared is the answer without the one gap row and the readiness fields that declaring a required figure moves (judged just above).
+    base = without_readiness(without_additions(plain)) if paths else without_additions(plain)
+    stripped = (
+        without_additions(without_open_declared(plain, annotated, paths))
+        if paths
+        else without_additions(annotated)
+    )
+    if (diff := first_difference(class_free(base), class_free(stripped))) is not None:
         out.append(f"declaring {declared} changed more than class labels: {diff}")
-    before, after = class_ranks(without_additions(plain)), class_ranks(stripped)
+    before, after = class_ranks(base), class_ranks(stripped)
     if set(before) != set(after):
         out.append(f"the places that state a class changed: {sorted(set(before) ^ set(after))[:4]}")
     for where in sorted(set(before) & set(after)):
@@ -198,7 +317,8 @@ def honouring(
         and class_rank(r.get("evidence")) == 0
         for r in (annotated.get(ADDED_TOP) or [])
     )
-    before, after = class_ranks(plain), class_ranks(without_additions(annotated))
+    core = without_additions(without_open_declared(plain, annotated, {QUALIFY_ENGINE_PATH[field]}))
+    before, after = class_ranks(without_readiness(plain)), class_ranks(core)
     lowered = any(
         w in after
         and len(after[w]) == len(before[w])
@@ -333,13 +453,17 @@ def gap_paths(block: dict[str, Any]) -> set[str]:
     }
 
 
-def completeness_violations(block: dict[str, Any]) -> list[str]:
+def completeness_violations(
+    block: dict[str, Any], declared_open: frozenset[str] = frozenset()
+) -> list[str]:
     """A reported completeness against the missing / required lists in the SAME block. Empty means they agree.
 
     EVALUATES: a fraction in [0, 1]; 1.0 only with no REQUIRED gap listed and `required_inputs_missing` (when reported) zero; below 1.0 only
     with at least one gap listed (a score short of full must show what is short); `required_inputs_missing` equal to the number of gaps listed
-    as required; `can_issue_a_study` true exactly when nothing required is missing; `assumed_count` (when reported) not above the number of
-    figures the response lists as declared. DOES NOT EVALUATE the denominator, the weighting, or whether a gap really is a gap.
+    as required, not counting the gap rows of figures the request declared assumed (`declared_open`, intake paths): those were sent, so the count
+    of MISSING inputs leaves them out, and the product says so in `assumed_count_note`; `can_issue_a_study` true exactly when no required gap is
+    listed at all (a declared one included); `assumed_count` (when reported) not above the number of figures the response lists as declared.
+    DOES NOT EVALUATE the denominator, the weighting, or whether a gap really is a gap.
     """
     out: list[str] = []
     c = block.get("completeness")
@@ -352,17 +476,23 @@ def completeness_violations(block: dict[str, Any]) -> list[str]:
         return [f"completeness {c!r} is not a fraction in [0, 1]"]
     gaps = [g for g in block["gaps"] if isinstance(g, dict)]
     required = [g for g in gaps if g.get("required") is True]
-    if c >= 1 and required:
+    missing_rows = [g for g in required if g.get("path") not in declared_open]
+    if c >= 1 and missing_rows:
         out.append(
-            f"completeness is {c:g} but required gaps are listed: {[g.get('path') for g in required][:4]}"
+            f"completeness is {c:g} but required gaps are listed: {[g.get('path') for g in missing_rows][:4]}"
         )
     if c < 1 and not gaps:
         out.append(f"completeness is {c:g} but no gap is listed to account for it")
     missing = block.get("required_inputs_missing")
     if missing is not None:
-        if missing != len(required):
+        if missing != len(missing_rows):
             out.append(
-                f"required_inputs_missing is {missing!r}, {len(required)} gaps are listed as required"
+                f"required_inputs_missing is {missing!r}, {len(missing_rows)} gaps are listed as required"
+                + (
+                    f" besides {len(required) - len(missing_rows)} declared assumed"
+                    if len(required) != len(missing_rows)
+                    else ""
+                )
             )
         if c >= 1 and missing:
             out.append(f"completeness is {c:g} with {missing} required inputs missing")

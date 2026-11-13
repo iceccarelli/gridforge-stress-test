@@ -12,7 +12,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .assumed_fields import class_ranks, first_difference
+from .assumed_fields import (
+    added_open_paths,
+    class_ranks,
+    first_difference,
+    open_paths_violations,
+    without_open_declared,
+    without_readiness,
+)
 
 #: The highest class a client's own attestation can earn (the product's own text: "E6 and E7 are earned through the calibration ledger").
 CLIENT_CEILING = 5
@@ -67,7 +74,11 @@ def engine_view(result: Any) -> Any:
 
 
 def parity_violations(
-    label: str, plain: dict[str, Any], annotated: dict[str, Any], path: str
+    label: str,
+    plain: dict[str, Any],
+    annotated: dict[str, Any],
+    path: str,
+    e0_paths: tuple[str, ...] = (),
 ) -> list[str]:
     """`plain` and `annotated` are batch rows ({status: ok|clean|fault, result?, message?}) for the same hall with figure `path` given as a bare
     number and as an annotated object with the SAME number. Empty means the annotation changed nothing it should not.
@@ -75,6 +86,12 @@ def parity_violations(
     EVALUATES: neither is a server fault; the plain figure is answered exactly when the annotated one is (a refusal for one and an answer for the
     other is a difference in the NUMBER's treatment); when both are answered, every number and label is identical, and the annotated answer's
     prose keeps every line the plain one has and adds only lines that name `path`. DOES NOT EVALUATE the answer itself.
+
+    `e0_paths` names the intake paths this annotated answer declared at class E0. A REQUIRED figure declared an assumption is open (the product's rule:
+    it is "a template's value and not this hall's"), so for each such path for which the answer lists a gap row the plain one did not, exactly that
+    row and the intake's readiness fields (`can_issue_a_study`, `recommended_engagement`) may differ, and only as `assumed_fields.open_paths_violations`
+    states them: one required row that says it is an assumption, the Study not issuable, the sentence saying so. Every other figure, every other
+    class and every other key is held to numeric identity as before; a figure that is not required gets no allowance.
     """
     out: list[str] = []
     for name, row in (("plain", plain), ("annotated", annotated)):
@@ -92,9 +109,11 @@ def parity_violations(
         ]
     if plain["status"] != "ok":
         return out
-    if (
-        d := first_difference(engine_view(plain["result"]), engine_view(annotated["result"]))
-    ) is not None:
+    left, right = plain["result"], annotated["result"]
+    if added := added_open_paths(set(e0_paths), left, right):
+        out += [f"{label}: {v}" for v in open_paths_violations(added, left, right)]
+        left, right = without_readiness(left), without_open_declared(left, right, added)
+    if (d := first_difference(engine_view(left), engine_view(right))) is not None:
         out.append(f"{label}: the annotated figure changed the answer: {d}")
     before, after = prose(plain["result"]), prose(annotated["result"])
     for line in sorted(before - after):

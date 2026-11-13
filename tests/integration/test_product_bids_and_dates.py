@@ -1,11 +1,14 @@
 """Procurement and schedule invariants on the real product, derived from the rules a buyer relies on, not from the product's code.
 
-Bids: an offer past its validity must not win; prices in different currencies must not be ranked as if comparable.
+Bids: an offer past its validity must not win; prices in different currencies must not be ranked as if comparable. An offer's own figures are held to
+the specification's numeric 'shall' minimum (the product says so in its answer), so the offers here answer that minimum, read from the specification
+the supplier is sent, and the one test of that rule offers less and must lose.
 Dates: a stated date must lie inside its own stated range (low <= weeks <= high)."""
 
 from __future__ import annotations
 
 import copy
+import re
 
 import pytest
 
@@ -19,12 +22,31 @@ def _need_product():
     require_product()
 
 
+_SPEC: dict = {}
+
+
+def _spec():
+    if not _SPEC:
+        _SPEC.update(run("/v1/spec", {"intake": mutated(lambda d: None)}))
+    return _SPEC
+
+
+def specified_duty() -> int:
+    """The continuous ampacity the specification's 'shall' asks for, read from the document the supplier is sent (its row: 'Busway continuous ampacity',
+    'shall', '1,990 A (E0)'), not from the product's evaluation of a bid."""
+    m = re.search(
+        r"Busway continuous ampacity</td><td>shall</td><td>([\d,]+) A", _spec()["document"]
+    )
+    assert m, "the specification no longer states a numeric busway ampacity minimum in its table"
+    return int(m.group(1).replace(",", ""))
+
+
 @pytest.fixture(scope="module")
 def template():
-    return run("/v1/spec", {"intake": mutated(lambda d: None)})["response_template"]
+    return _spec()["response_template"]
 
 
-def bid(template, supplier, capex, lead, *, valid_until="2026-12-31", currency="EUR"):
+def bid(template, supplier, capex, lead, *, valid_until="2026-12-31", currency="EUR", duty=None):
     d = copy.deepcopy(template)
     d.update(supplier=supplier, received_on="2026-10-20", valid_until=valid_until)
     if currency is None:
@@ -36,7 +58,7 @@ def bid(template, supplier, capex, lead, *, valid_until="2026-12-31", currency="
         lead_time_weeks=lead,
         install_weeks=4,
         outage_hours_per_unit=8,
-        duty_at_site_conditions=1,
+        duty_at_site_conditions=specified_duty() if duty is None else duty,
         validity_days=60,
     )
     d["compliance"] = {k: "C" for k in d["compliance"]}
@@ -58,6 +80,20 @@ def test_an_expired_offer_is_disqualified_and_cannot_lead(template):
     )
     assert by["B-expired"]["disqualified"] and not by["A-valid"]["disqualified"]
     assert leading == "A-valid"
+
+
+def test_an_offer_below_the_specified_minimum_is_not_compliant_and_cannot_lead(template):
+    """The product holds a bid's own figures to the specification's numeric 'shall': a duty one ampere under the minimum is not compliant, whatever
+    code the bid declared, so the dearer offer that meets it leads. The control for the fixtures above, which offer exactly the minimum."""
+    by, leading = rank(
+        template,
+        [
+            bid(template, "A-short", 100000, 20, duty=specified_duty() - 1),
+            bid(template, "B-meets", 400000, 20),
+        ],
+    )
+    assert not by["A-short"]["compliant"] and by["B-meets"]["compliant"], by
+    assert leading == "B-meets"
 
 
 def test_validity_runs_through_the_report_date_inclusive(template):

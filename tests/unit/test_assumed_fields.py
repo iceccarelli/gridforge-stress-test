@@ -48,7 +48,11 @@ def plain() -> dict[str, Any]:
         "intake": {
             "completeness": 0.29,
             "required_inputs_missing": 1,
-            "gaps": [{"path": "ups", "required": True}],
+            "can_issue_a_study": False,
+            "recommended_engagement": "1 required input is missing. That is too thin for a full Study yet.",
+            "gaps": [
+                {"path": "ups", "required": True, "assumed": "no UPS: the load is unprotected"}
+            ],
         },
     }
 
@@ -74,6 +78,18 @@ def declared(names: list[str]) -> tuple[dict[str, Any], dict[str, Any]]:
         }
         for n in order
     ]
+    # The product's rule: a required figure declared an assumption is OPEN: one required gap row naming it, the Study not issuable, the sentence says so.
+    out["intake"]["gaps"] += [
+        {
+            "path": paths[n][0],
+            "required": True,
+            "assumed": f"{REQUEST[n]}, declared as an assumption (E0): it counts as open until the hall's own figure replaces it",
+        }
+        for n in order
+    ]
+    out["intake"]["recommended_engagement"] += (
+        f" {len(names)} more was sent but declared as an assumption (class E0), so it counts as open."
+    )
     out["intake"]["assumed_count"] = len(names)
     out["intake"]["assumed_count_note"] = (
         "completeness counts figures declared assumed as supplied; assumed_count of them are assumptions"
@@ -134,6 +150,30 @@ MUTATIONS = {
     "count unexplained": lambda a: a["intake"].update(assumed_count_note="see docs"),
     "completeness changed": lambda a: a["intake"].update(completeness=0.5),
     "a gap hidden": lambda a: a["intake"].update(gaps=[]),
+    # a declared required figure is OPEN: one required row naming it, the Study not issuable, the sentence says so
+    "a declared figure has no gap row": lambda a: a["intake"]["gaps"].pop(),
+    "a declared figure's row is not required": lambda a: a["intake"]["gaps"][-1].update(
+        required=False
+    ),
+    "a declared figure's row does not say assumption": lambda a: a["intake"]["gaps"][-1].update(
+        assumed="a value"
+    ),
+    "a declared figure is listed twice": lambda a: a["intake"]["gaps"].append(
+        dict(a["intake"]["gaps"][-1])
+    ),
+    "the Study is issuable on an assumption": lambda a: a["intake"].update(can_issue_a_study=True),
+    "the readiness sentence is silent about it": lambda a: a["intake"].update(
+        recommended_engagement="1 required input is missing. That is too thin for a full Study yet."
+    ),
+    "an undeclared gap row appears": lambda a: a["intake"]["gaps"].append(
+        {"path": "transformers", "required": True}
+    ),
+    "a plain gap is changed under cover of the declared row": lambda a: a["intake"]["gaps"][
+        0
+    ].update(required=False),
+    "a plain gap's text is changed": lambda a: a["intake"]["gaps"][0].update(
+        assumed="treated as no limit"
+    ),
 }
 
 
@@ -323,6 +363,57 @@ def test_a_consistent_block_passes():
 )
 def test_every_inconsistent_block_is_flagged(bad):
     assert completeness_violations(bad)
+
+
+DECLARED = frozenset({"c"})
+
+
+def declared_block(**kw: Any) -> dict[str, Any]:
+    """One required input missing ('a') and one declared assumed ('c': sent, so not counted as missing, but open: the Study cannot be issued)."""
+    base = block(gaps=[{"path": "a", "required": True}, {"path": "c", "required": True}])
+    base.update(kw)
+    return base
+
+
+def test_a_declared_assumed_row_is_open_but_is_not_a_missing_input():
+    assert completeness_violations(declared_block(), DECLARED) == []
+    # all sent, one declared: nothing is missing, the score may be 1.0, and the Study is still not issuable
+    only = block(
+        completeness=1.0,
+        required_inputs_missing=0,
+        can_issue_a_study=False,
+        gaps=[{"path": "c", "required": True}],
+    )
+    assert completeness_violations(only, DECLARED) == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        declared_block(required_inputs_missing=2),  # counts the declared row as missing
+        declared_block(required_inputs_missing=0),  # leaves out a genuinely missing one
+        declared_block(can_issue_a_study=True),  # issuable with a required row listed
+        block(
+            completeness=1.0,
+            required_inputs_missing=0,
+            can_issue_a_study=True,
+            gaps=[{"path": "c", "required": True}],
+        ),
+        block(
+            completeness=1.0,
+            required_inputs_missing=0,
+            can_issue_a_study=False,
+            gaps=[{"path": "a", "required": True}],
+        ),
+    ],
+)
+def test_a_declared_row_buys_no_leniency_for_anything_else(bad):
+    assert completeness_violations(bad, DECLARED)
+
+
+def test_without_the_declaration_the_old_strictness_stands():
+    """The same block, with `c` not declared, is the inconsistent block it always was: two required rows and a count of one."""
+    assert completeness_violations(declared_block())
 
 
 def test_family_judge_flags_a_score_that_falls_as_gaps_close_and_an_assumed_that_raises():
