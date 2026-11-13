@@ -95,8 +95,15 @@ def leaves(node, path=""):
 )
 def test_undefined_grid_fields_cannot_change_the_answer(intake, baseline, key, value):
     out = compare(mutated(intake, lambda x: x["grid"].__setitem__(key, value)))
-    assert out["ok"], out
-    assert answer(out["result"]) == answer(baseline)
+    if out["ok"]:
+        assert answer(out["result"]) == answer(baseline)
+        return
+    # The product used to ignore a key it does not read, silently. It now REFUSES one (GridForge-AI intake allow-lists), because a customer who
+    # sends `grid.headroom_MW: 500` would otherwise believe the study used it. A refusal also leaves the answer unchanged: nothing the field says
+    # reaches a result. What is NOT acceptable is any other failure: a server fault, or an error that does not say which key was refused.
+    assert out.get("error") == "IntakeError", out
+    assert f"grid.{key}" in out.get("message", ""), out
+    assert "not an input" in out["message"], out
 
 
 @pytest.mark.parametrize("where", [("grid", "queue_note"), ("project", "note")])
