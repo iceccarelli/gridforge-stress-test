@@ -97,6 +97,40 @@ jobs:
           git add .product-pin
           git commit -m "test: pin product to GridForge ${LATEST_SHA:0:12}"
           git push --set-upstream origin "$branch"
+          branch_sha="$(git rev-parse HEAD)"
+
+          # GITHUB_TOKEN pull_request events can require a human approval before their workflows run.
+          # Dispatch both workflows explicitly (an allowed GITHUB_TOKEN event), wait for the exact
+          # branch commit, and create the PR only after all acceptance jobs pass.
+          wait_for_run() {
+            local workflow="$1"
+            local run_id=""
+            for _ in $(seq 1 45); do
+              run_id="$(gh run list \
+                --repo iceccarelli/gridforge-stress-test \
+                --workflow "$workflow" \
+                --branch "$branch" \
+                --event workflow_dispatch \
+                --limit 20 \
+                --json databaseId,headSha \
+                --jq ".[] | select(.headSha == \"$branch_sha\") | .databaseId" | head -n1)"
+              if [[ -n "$run_id" ]]; then break; fi
+              sleep 2
+            done
+            [[ -n "$run_id" ]] || { echo "No workflow_dispatch run appeared for $workflow at $branch_sha" >&2; return 1; }
+            gh run watch "$run_id" --repo iceccarelli/gridforge-stress-test --exit-status
+          }
+
+          gh workflow run product-integration.yml \
+            --repo iceccarelli/gridforge-stress-test \
+            --ref "$branch" \
+            -f "product_ref=$LATEST_SHA"
+          wait_for_run product-integration.yml
+
+          gh workflow run ci.yml \
+            --repo iceccarelli/gridforge-stress-test \
+            --ref "$branch"
+          wait_for_run ci.yml
 
           gh pr create \
             --repo iceccarelli/gridforge-stress-test \
@@ -107,4 +141,11 @@ jobs:
 
           Advance the independent stress harness from `$CURRENT_SHA` to upstream GridForge-AI `$LATEST_SHA`.
 
-          This PR was opened automatically because engine/deploy-source files changed upstream. It changes only `.product-pin`. The product integration workflow must pass against this exact SHA before merge."
+          This PR was opened automatically because engine/deploy-source files changed upstream. It changes only `.product-pin`.
+
+          ## Pre-PR verification
+          The watcher explicitly dispatched and waited for both workflows against branch commit `$branch_sha`:
+          - `product-integration.yml` with product_ref `$LATEST_SHA` (product tests, end-to-end oracle, hostile-input fuzz, exact identity)
+          - `ci.yml` (Python 3.11/3.12/3.13, Ruff, mypy, pytest, packaging and dependency audit)
+
+          The PR is created only after both runs succeed. No automatic merge or deployment."
