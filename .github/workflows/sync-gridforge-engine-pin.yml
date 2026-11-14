@@ -1,0 +1,110 @@
+name: sync GridForge engine pin
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: gridforge-product-pin-sync
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      needs_sync: ${{ steps.compare.outputs.needs_sync }}
+      current_sha: ${{ steps.compare.outputs.current_sha }}
+      latest_sha: ${{ steps.compare.outputs.latest_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+
+      - name: Compare pinned product with upstream main
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_sha="$(tr -d '\r\n' < .product-pin)"
+          latest_sha="$(git ls-remote https://github.com/iceccarelli/GridForge-AI.git refs/heads/main | awk '{print $1}')"
+
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid .product-pin: refusing to guess"; exit 1; }
+          [[ "$latest_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Could not resolve upstream main"; exit 1; }
+
+          echo "current_sha=$current_sha" >> "$GITHUB_OUTPUT"
+          echo "latest_sha=$latest_sha" >> "$GITHUB_OUTPUT"
+          echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+
+          if [[ "$current_sha" == "$latest_sha" ]]; then
+            echo "The harness already pins upstream main."
+            exit 0
+          fi
+
+          compare_json="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/iceccarelli/GridForge-AI/compare/${current_sha}...${latest_sha}")"
+
+          changed_files="$(jq -r '.files[]?.filename' <<< "$compare_json")"
+          if ! grep -Eq '^(gridforge/|examples/intake/|pyproject\.toml$|Dockerfile$|fly\.toml$|\.dockerignore$)' <<< "$changed_files"; then
+            echo "Upstream moved, but no engine/deploy-source file changed; the pin is intentionally unchanged."
+            exit 0
+          fi
+
+          open_sync_prs="$(gh pr list --repo iceccarelli/gridforge-stress-test --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("sync/gridforge-"))] | length')"
+          if [[ "$open_sync_prs" -gt 0 ]]; then
+            echo "An upstream pin-update PR is already open; not creating another."
+            exit 0
+          fi
+
+          echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+          echo "Engine/deploy-source changes detected in upstream $latest_sha:"
+          printf '%s\n' "$changed_files" | grep -E '^(gridforge/|examples/intake/|pyproject\.toml$|Dockerfile$|fly\.toml$|\.dockerignore$)' || true
+
+  open-pin-pr:
+    needs: check
+    if: needs.check.outputs.needs_sync == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Create a single reviewable pin-update PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_SHA: ${{ needs.check.outputs.current_sha }}
+          LATEST_SHA: ${{ needs.check.outputs.latest_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="sync/gridforge-${LATEST_SHA:0:12}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          printf '%s\n' "$LATEST_SHA" > .product-pin
+          git add .product-pin
+          git commit -m "test: pin product to GridForge ${LATEST_SHA:0:12}"
+          git push --set-upstream origin "$branch"
+
+          gh pr create \
+            --repo iceccarelli/gridforge-stress-test \
+            --base main \
+            --head "$branch" \
+            --title "test: sync product pin to GridForge ${LATEST_SHA:0:12}" \
+            --body "## Summary
+
+          Advance the independent stress harness from `$CURRENT_SHA` to upstream GridForge-AI `$LATEST_SHA`.
+
+          This PR was opened automatically because engine/deploy-source files changed upstream. It changes only `.product-pin`. The product integration workflow must pass against this exact SHA before merge."
