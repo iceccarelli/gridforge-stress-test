@@ -9,6 +9,14 @@ name: product-integration
 # public, so the default workflow token is enough. If it ever becomes private, add a `token:` input to the product
 # checkout (a read-only contents token stored as a repository secret); see CONTRIBUTING.md.
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".product-pin"
+      - ".github/workflows/product-integration.yml"
+      - "src/gridforge_stress/**"
+      - "tests/integration/**"
+      - "data/fixtures/product/**"
   push:
     branches: [main]
   schedule:
