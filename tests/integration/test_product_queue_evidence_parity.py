@@ -32,8 +32,12 @@ def test_lbnl_queue_context_is_the_same_source_artifact_in_harness_engine_and_we
     website = product / "lib" / "queue-evidence.json"
 
     source_bytes = harness.read_bytes()
-    assert engine.read_bytes() == source_bytes, "engine queue context drifted from the stress harness fixture"
-    assert website.read_bytes() == source_bytes, "website queue evidence drifted from the stress harness fixture"
+    assert engine.read_bytes() == source_bytes, (
+        "engine queue context drifted from the stress harness fixture"
+    )
+    assert website.read_bytes() == source_bytes, (
+        "website queue evidence drifted from the stress harness fixture"
+    )
 
     context = json.loads(source_bytes)
     assert context["source_id"] == "lbnl-queued-up"
@@ -51,7 +55,9 @@ def test_lbnl_queue_context_is_the_same_source_artifact_in_harness_engine_and_we
 def test_lbnl_fixture_manifest_and_website_capacity_snapshot_share_the_same_publisher_workbook():
     product = product_dir()
     fixture = fixtures_dir() / "lbnl_ir_to_cod_context.json"
-    manifest = json.loads((fixtures_dir() / "lbnl_ir_to_cod_context.json.manifest.json").read_text())
+    manifest = json.loads(
+        (fixtures_dir() / "lbnl_ir_to_cod_context.json.manifest.json").read_text()
+    )
     context = json.loads(fixture.read_text())
     capacity = json.loads((product / "lib" / "queue-active-capacity.json").read_text())
 
